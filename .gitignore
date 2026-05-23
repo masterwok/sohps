@@ -1,0 +1,32 @@
+# Gemini & Agent Artifacts
+.gemini/
+GEMINI.md
+.gemini-agent/
+plans/
+memory/
+findings.txt
+root_findings.txt
+target_findings.txt
+
+# SOHPS Build Binaries
+/sohps
+/sohps_amd64
+/sohps_arm64
+
+# Go Artifacts
+vendor/
+
+# Test Environment Artifacts
+testenv/bin/
+testenv/build/
+/tmp/sohps_*
+
+# IDE & Editor Files
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS Metadata
+.DS_Store
+Thumbs.db
