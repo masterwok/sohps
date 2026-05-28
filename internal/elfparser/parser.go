@@ -47,11 +47,15 @@ func ExtractRawSearchPaths(f *elf.File, ldLibraryPath string) []string {
 	if runpaths, err := f.DynString(elf.DT_RUNPATH); err == nil && len(runpaths) > 0 {
 		hasRunpath = true
 		for _, rp := range runpaths {
-			searchPaths = append(searchPaths, strings.Split(rp, ":")...)
+			if rp != "" {
+				searchPaths = append(searchPaths, strings.Split(rp, ":")...)
+			}
 		}
 	} else if rpaths, err := f.DynString(elf.DT_RPATH); err == nil && len(rpaths) > 0 {
 		for _, rp := range rpaths {
-			searchPaths = append(searchPaths, strings.Split(rp, ":")...)
+			if rp != "" {
+				searchPaths = append(searchPaths, strings.Split(rp, ":")...)
+			}
 		}
 	}
 

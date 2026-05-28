@@ -74,6 +74,13 @@ binaries: $(BUILD_DIR)/libcustom.so
 	$(CC) $(CFLAGS) $(SRC) $(LDFLAGS) -Wl,--enable-new-dtags -Wl,-rpath,/tmp/sohps_test/one:/tmp/sohps_test/two -o $(BIN_DIR)/test_colon_split
 	# Nodefaultlib (-z nodefaultlib)
 	$(CC) $(CFLAGS) $(SRC) $(LDFLAGS) -Wl,-z,nodefaultlib -Wl,-rpath,/tmp/sohps_test/nodeflib -o $(BIN_DIR)/test_nodeflib
+	
+	# --- Empty Path Logic Binaries ---
+	# 1. Strictly Empty RUNPATH (Safe)
+	$(CC) $(CFLAGS) test_empty_runpath.c -o $(BIN_DIR)/test_strictly_empty -Wl,--enable-new-dtags -Wl,-rpath,""
+	
+	# 2. Trailing Colon RUNPATH (Vulnerable)
+	$(CC) $(CFLAGS) test_empty_runpath.c -o $(BIN_DIR)/test_trailing_colon -Wl,--enable-new-dtags -Wl,-rpath,"/tmp:"
 
 clean:
 	-chmod -R 777 /tmp/sohps_test /tmp/sohps_readonly /tmp/sohps_writable_file 2>/dev/null
