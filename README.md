@@ -21,7 +21,7 @@
 
 ## Capabilities
 
-`sohps` provides high-fidelity analysis by implementing core `ld.so` logic:
+`sohps` simulates the following `ld.so` logic:
 
 - **Linker Macro Expansion**: Full support for `$ORIGIN`, `$LIB`, and `$PLATFORM` expansion based on the target binary's architecture.
 - **Search Path Prioritization**: Correctly handles the precedence of `DT_RPATH` vs. `DT_RUNPATH` and their interaction with `LD_LIBRARY_PATH`.
