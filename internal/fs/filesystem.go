@@ -44,7 +44,7 @@ func FindWritableParent(targetPath string) (string, bool) {
 	for {
 		parent := filepath.Dir(dir)
 		
-		// If filepath.Dir returns the same path, we've hit the root (e.g., "/" or "C:\")
+		// If filepath.Dir returns the same path, we've hit the root (e.g., "/")
 		if parent == dir {
 			break
 		}
