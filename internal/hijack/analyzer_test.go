@@ -139,11 +139,26 @@ func TestBuildSearchPaths(t *testing.T) {
 		name     string
 		rawPaths []string
 		expected []SearchPath
+		setup    func(dir string) (target string)
 	}{
 		{
 			name:     "Expands $ORIGIN to binary directory",
 			rawPaths: []string{"$ORIGIN/lib"},
 			expected: []SearchPath{{Raw: "$ORIGIN/lib", Resolved: "/opt/app/bin/lib"}},
+		},
+		{
+			name: "Resolves $ORIGIN via symlink",
+			setup: func(dir string) string {
+				realDir := filepath.Join(dir, "real")
+				os.Mkdir(realDir, 0755)
+				realBinary := filepath.Join(realDir, "binary")
+				os.WriteFile(realBinary, []byte(""), 0755)
+				linkBinary := filepath.Join(dir, "link")
+				os.Symlink(realBinary, linkBinary)
+				return linkBinary
+			},
+			rawPaths: []string{"$ORIGIN/lib"},
+			expected: []SearchPath{{Raw: "$ORIGIN/lib", Resolved: "REAL_DIR/lib"}},
 		},
 		{
 			name:     "Expands ${ORIGIN} to binary directory",
@@ -179,17 +194,33 @@ func TestBuildSearchPaths(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := buildSearchPaths(tc.rawPaths, targetBinary, false, "EM_X86_64")
+			tmp := t.TempDir()
+			target := targetBinary
+			realDir := ""
 
-			if len(result) != len(tc.expected) {				t.Fatalf("expected %d paths, got %d", len(tc.expected), len(result))
+			if tc.setup != nil {
+				target = tc.setup(tmp)
+				realDir = filepath.Join(tmp, "real")
+			}
+
+			result := buildSearchPaths(tc.rawPaths, target, false, "EM_X86_64")
+
+			if len(result) != len(tc.expected) {
+				t.Fatalf("expected %d paths, got %d", len(tc.expected), len(result))
 			}
 
 			for i, path := range result {
 				if path.Raw != tc.expected[i].Raw {
 					t.Errorf("expected raw %q, got %q", tc.expected[i].Raw, path.Raw)
 				}
-				if path.Resolved != tc.expected[i].Resolved {
-					t.Errorf("expected resolved %q, got %q", tc.expected[i].Resolved, path.Resolved)
+
+				expectedResolved := tc.expected[i].Resolved
+				if realDir != "" {
+					expectedResolved = strings.ReplaceAll(expectedResolved, "REAL_DIR", realDir)
+				}
+
+				if path.Resolved != expectedResolved {
+					t.Errorf("expected resolved %q, got %q", expectedResolved, path.Resolved)
 				}
 			}
 		})

@@ -16,13 +16,23 @@ func DiscoverBinaries(targetPath string) ([]string, error) {
 			return nil
 		}
 
-		// Prune virtual and irrelevant directories to speed up root scans
+		// Prune virtual and irrelevant directories to speed up root scans.
 		if d.IsDir() {
 			name := d.Name()
-			if strings.HasPrefix(name, ".") ||
-				name == "proc" || name == "sys" || name == "dev" || name == "run" || name == "snap" {
+			
+			// 1. Skip specifically excluded system directories if they are at the root.
+			// We check both absolute path and ensure it's at the top level.
+			abs, _ := filepath.Abs(path)
+			if abs == "/proc" || abs == "/sys" || abs == "/dev" || 
+			   abs == "/run" || abs == "/snap" || abs == "/var/lib/lxcfs" {
 				return filepath.SkipDir
 			}
+
+			// 2. Skip hidden directories (e.g., .git) unless the scan started there
+			if strings.HasPrefix(name, ".") && path != targetPath {
+				return filepath.SkipDir
+			}
+			
 			return nil
 		}
 

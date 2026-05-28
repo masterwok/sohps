@@ -61,9 +61,10 @@ func TestDiscoverBinaries(t *testing.T) {
 	link := filepath.Join(subdir, "link_to_bin1")
 	os.Symlink(bin1, link)
 
-	proc := filepath.Join(tmp, "proc")
-	os.Mkdir(proc, 0755)
-	bin3 := filepath.Join(proc, "bin3.elf")
+	// A hidden directory (Should be ignored unless it's the root)
+	hiddenDir := filepath.Join(tmp, ".git")
+	os.Mkdir(hiddenDir, 0755)
+	bin3 := filepath.Join(hiddenDir, "bin3.elf")
 	os.WriteFile(bin3, []byte("\x7fELF3"), 0755)
 
 	results, err := DiscoverBinaries(tmp)
@@ -71,9 +72,7 @@ func TestDiscoverBinaries(t *testing.T) {
 		t.Fatalf("DiscoverBinaries failed: %v", err)
 	}
 
-	// We expect bin1 and bin2. bin3 is in /proc (ignored). link_to_bin1 is bin1 (de-duplicated).
-	// However, DiscoverBinaries returns the FIRST path it finds for a unique binary.
-	// So it should return bin1 and bin2.
+	// We expect bin1 and bin2. bin3 is in .git (ignored). link_to_bin1 is bin1 (de-duplicated).
 	
 	if len(results) != 2 {
 		t.Errorf("expected 2 binaries, got %d: %v", len(results), results)
@@ -88,8 +87,8 @@ func TestDiscoverBinaries(t *testing.T) {
 		if filepath.Base(path) == "bin2.elf" {
 			foundBin2 = true
 		}
-		if filepath.Base(path) == "bin3.elf" {
-			t.Errorf("found bin3.elf in ignored directory /proc")
+		if filepath.Base(path) == ".git" || filepath.Base(path) == "bin3.elf" {
+			t.Errorf("found %s in ignored directory .git", path)
 		}
 	}
 

@@ -37,8 +37,13 @@ func getHWCAPPaths(basePath, machineType string) []string {
 func buildSearchPaths(rawPaths []string, targetBinary string, isSecure bool, machineType string) []SearchPath {
 	var searchPaths []SearchPath
 
-	// ld.so resolves $ORIGIN relative to the binary's actual location
-	binaryDir := filepath.Dir(targetBinary)
+	// ld.so resolves $ORIGIN relative to the binary's actual location.
+	// We must resolve symlinks to mimic this behavior accurately.
+	resolvedBinary, err := filepath.EvalSymlinks(targetBinary)
+	if err != nil {
+		resolvedBinary = targetBinary
+	}
+	binaryDir := filepath.Dir(resolvedBinary)
 
 	// Determine $LIB and $PLATFORM expansions based on ELF Machine type
 	libMacro := "lib"
