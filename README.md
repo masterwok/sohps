@@ -4,7 +4,7 @@
 
 ---
 
-## 🛡️ Vulnerability Classes
+## Vulnerability Classes
 
 `sohps` categorizes findings into several distinct attack vectors, providing researchers with immediate context for exploitation:
 
@@ -19,7 +19,7 @@
 
 ---
 
-## 🚀 Capabilities
+## Capabilities
 
 `sohps` provides high-fidelity analysis by implementing core `ld.so` logic:
 
@@ -32,7 +32,7 @@
 
 ---
 
-## ⚠️ Shortcomings & Limitations
+## Shortcomings & Limitations
 
 While `sohps` is a powerful tool, users should be aware of its technical boundaries:
 
@@ -43,7 +43,7 @@ While `sohps` is a powerful tool, users should be aware of its technical boundar
 
 ---
 
-## 🛠️ Installation & Building
+## Installation & Building
 
 `sohps` is written in Go and requires version 1.21 or later.
 
@@ -67,7 +67,7 @@ GOOS=linux GOARCH=arm64 go build -o sohps_arm64 ./cmd/sohps/main.go
 
 ---
 
-## 🧪 Testing & Verification
+## Testing & Verification
 
 ### Running Unit Tests
 The project includes a comprehensive suite of unit tests for all internal packages:
@@ -91,7 +91,7 @@ This will enumerate all 6 primary vulnerability classes, including **System Prel
 
 ---
 
-## 🛡️ Usage
+## Usage
 
 ```bash
 # Scan a single binary
@@ -108,4 +108,158 @@ This will enumerate all 6 primary vulnerability classes, including **System Prel
 
 # Verbose scan (show safe targets) with no color for logging
 ./sohps -v -nc / > scan_report.txt
+```
+
+## Example
+
+```
+$ ./sohps testenv/
+[*] Scanning testenv/...
+[*] Found 12 ELF binaries. Starting analysis...
+
+[*] testenv/bin/test_colon_split
+    [!] Writable Path
+    Vulnerable Path : /tmp/sohps_test/one
+    Resolved Dir    : /tmp/sohps_test/one/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/tmp). Recreate full path and drop payload at: /tmp/sohps_test/one/tls/aarch64/aarch64/libc.so.6
+    Libraries (1)   : libc.so.6
+
+    [!] Writable Path
+    Vulnerable Path : /tmp/sohps_test/two
+    Resolved Dir    : /tmp/sohps_test/two/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/tmp). Recreate full path and drop payload at: /tmp/sohps_test/two/tls/aarch64/aarch64/libc.so.6
+    Libraries (1)   : libc.so.6
+
+    [!] Writable Path
+    Vulnerable Path : /tmp/sohps_test/one
+    Resolved Dir    : /tmp/sohps_test/one/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/tmp). Recreate full path and drop payload at: /tmp/sohps_test/one/tls/aarch64/aarch64/libcustom.so
+    Libraries (1)   : libcustom.so
+
+    [!] Writable Path
+    Vulnerable Path : /tmp/sohps_test/two
+    Resolved Dir    : /tmp/sohps_test/two/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/tmp). Recreate full path and drop payload at: /tmp/sohps_test/two/tls/aarch64/aarch64/libcustom.so
+    Libraries (1)   : libcustom.so
+
+[*] testenv/bin/test_missing_writable
+    [!] Writable Path
+    Vulnerable Path : /tmp/sohps_test/missing
+    Resolved Dir    : /tmp/sohps_test/missing/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/tmp). Recreate full path and drop payload at: /tmp/sohps_test/missing/tls/aarch64/aarch64/libcustom.so
+    Libraries (1)   : libcustom.so
+
+    [!] Writable Path
+    Vulnerable Path : /tmp/sohps_test/missing
+    Resolved Dir    : /tmp/sohps_test/missing/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/tmp). Recreate full path and drop payload at: /tmp/sohps_test/missing/tls/aarch64/aarch64/libc.so.6
+    Libraries (1)   : libc.so.6
+
+[*] testenv/bin/test_needed_abs
+    [!] Absolute Path
+    Vulnerable Path : Hardcoded Absolute Path
+    Resolved Dir    : /tmp/sohps_test
+    Action          : RECREATE: Writable parent (/tmp). Recreate full path and drop payload at: /tmp/sohps_test/libcustom.so
+    Libraries (1)   : /tmp/sohps_test/libcustom.so
+
+[*] testenv/bin/test_nodeflib
+    [!] Writable Path
+    Vulnerable Path : /tmp/sohps_test/nodeflib
+    Resolved Dir    : /tmp/sohps_test/nodeflib/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/tmp). Recreate full path and drop payload at: /tmp/sohps_test/nodeflib/tls/aarch64/aarch64/libcustom.so
+    Libraries (1)   : libcustom.so
+
+    [!] Writable Path
+    Vulnerable Path : /tmp/sohps_test/nodeflib
+    Resolved Dir    : /tmp/sohps_test/nodeflib/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/tmp). Recreate full path and drop payload at: /tmp/sohps_test/nodeflib/tls/aarch64/aarch64/libc.so.6
+    Libraries (1)   : libc.so.6
+
+[*] testenv/bin/test_implicit_cwd
+    [!] Implicit CWD
+    Vulnerable Path : Empty Path (Implicit CWD)
+    Resolved Dir    : Runtime Current Working Directory
+    Action          : CWD HIJACK: Execute binary from an attacker-controlled writable directory containing a malicious payload.
+    Libraries (4)   : libcustom.so, libcustom.so, libc.so.6, libc.so.6
+
+[*] testenv/bin/test_origin
+    [!] $ORIGIN Hijack
+    Vulnerable Path : $ORIGIN/../lib
+    Resolved Dir    : /home/foo/dev/sohps/testenv/lib/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/home/foo/dev/sohps/testenv). Recreate full path and drop payload at: /home/foo/dev/sohps/testenv/lib/tls/aarch64/aarch64/libcustom.so
+    Libraries (1)   : libcustom.so
+
+    [!] $ORIGIN Hijack
+    Vulnerable Path : $ORIGIN/../lib
+    Resolved Dir    : /home/foo/dev/sohps/testenv/lib/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/home/foo/dev/sohps/testenv). Recreate full path and drop payload at: /home/foo/dev/sohps/testenv/lib/tls/aarch64/aarch64/libc.so.6
+    Libraries (1)   : libc.so.6
+
+[*] testenv/bin/test_rpath
+    [!] Writable Path
+    Vulnerable Path : /tmp/sohps_test/rpath
+    Resolved Dir    : /tmp/sohps_test/rpath/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/tmp). Recreate full path and drop payload at: /tmp/sohps_test/rpath/tls/aarch64/aarch64/libcustom.so
+    Libraries (1)   : libcustom.so
+
+    [!] Writable Path
+    Vulnerable Path : /tmp/sohps_test/rpath
+    Resolved Dir    : /tmp/sohps_test/rpath/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/tmp). Recreate full path and drop payload at: /tmp/sohps_test/rpath/tls/aarch64/aarch64/libc.so.6
+    Libraries (1)   : libc.so.6
+
+[*] testenv/bin/test_runpath
+    [!] Writable Path
+    Vulnerable Path : /tmp/sohps_test/runpath
+    Resolved Dir    : /tmp/sohps_test/runpath/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/tmp). Recreate full path and drop payload at: /tmp/sohps_test/runpath/tls/aarch64/aarch64/libcustom.so
+    Libraries (1)   : libcustom.so
+
+    [!] Writable Path
+    Vulnerable Path : /tmp/sohps_test/runpath
+    Resolved Dir    : /tmp/sohps_test/runpath/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/tmp). Recreate full path and drop payload at: /tmp/sohps_test/runpath/tls/aarch64/aarch64/libc.so.6
+    Libraries (1)   : libc.so.6
+
+[*] testenv/bin/test_relative
+    [!] Relative Path
+    Vulnerable Path : ./lib
+    Resolved Dir    : /home/foo/dev/sohps/lib/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/home/foo/dev/sohps). Recreate full path and drop payload at: /home/foo/dev/sohps/lib/tls/aarch64/aarch64/libcustom.so
+    Libraries (1)   : libcustom.so
+
+    [!] Relative Path
+    Vulnerable Path : ./lib
+    Resolved Dir    : /home/foo/dev/sohps/lib/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/home/foo/dev/sohps). Recreate full path and drop payload at: /home/foo/dev/sohps/lib/tls/aarch64/aarch64/libc.so.6
+    Libraries (1)   : libc.so.6
+
+[*] testenv/bin/test_writable_path
+    [!] Writable Path
+    Vulnerable Path : /tmp/sohps_test
+    Resolved Dir    : /tmp/sohps_test/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/tmp). Recreate full path and drop payload at: /tmp/sohps_test/tls/aarch64/aarch64/libcustom.so
+    Libraries (1)   : libcustom.so
+
+    [!] Writable Path
+    Vulnerable Path : /tmp/sohps_test
+    Resolved Dir    : /tmp/sohps_test/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/tmp). Recreate full path and drop payload at: /tmp/sohps_test/tls/aarch64/aarch64/libc.so.6
+    Libraries (1)   : libc.so.6
+
+[*] testenv/bin/test_writable_file
+    [!] Writable Path
+    Vulnerable Path : /tmp/sohps_writable_file
+    Resolved Dir    : /tmp/sohps_writable_file/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/tmp). Recreate full path and drop payload at: /tmp/sohps_writable_file/tls/aarch64/aarch64/libcustom.so
+    Libraries (1)   : libcustom.so
+
+    [!] Writable Path
+    Vulnerable Path : /tmp/sohps_writable_file
+    Resolved Dir    : /tmp/sohps_writable_file/tls/aarch64/aarch64
+    Action          : RECREATE: Writable parent (/tmp). Recreate full path and drop payload at: /tmp/sohps_writable_file/tls/aarch64/aarch64/libc.so.6
+    Libraries (1)   : libc.so.6
+
+[*] Progress: [12/12] 100.0%
+[*] Scan complete.
 ```
