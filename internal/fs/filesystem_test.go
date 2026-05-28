@@ -97,9 +97,9 @@ func TestFindWritableParent(t *testing.T) {
 	target := filepath.Join(child, "target_dir")
 
 	t.Run("Finds writable parent", func(t *testing.T) {
-		// Mock TestRoot to avoid skipping our temp dir
-		TestRoot = tmp
-		defer func() { TestRoot = "" }()
+		// Mock RootPath to avoid skipping our temp dir
+		RootPath = tmp
+		defer func() { RootPath = "" }()
 
 		// We start at target (which doesn't exist).
 		// We go up to child (RO).
@@ -116,12 +116,12 @@ func TestFindWritableParent(t *testing.T) {
 		}
 	})
 
-	t.Run("Stops at root or TestRoot", func(t *testing.T) {
-		TestRoot = parent // Set parent as root
-		defer func() { TestRoot = "" }()
+	t.Run("Stops at root or RootPath", func(t *testing.T) {
+		RootPath = parent // Set parent as root
+		defer func() { RootPath = "" }()
 
 		// Starting from target, we hit child (RO).
-		// Then we hit parent (which is TestRoot).
+		// Then we hit parent (which is RootPath).
 		// The loop should break and return nothing.
 		foundDir, found := FindWritableParent(target)
 		

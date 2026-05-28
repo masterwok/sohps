@@ -9,6 +9,7 @@ import (
 
 	"github.com/masterwok/sohps/internal/audit"
 	"github.com/masterwok/sohps/internal/elfparser"
+	"github.com/masterwok/sohps/internal/fs"
 	"github.com/masterwok/sohps/internal/hijack"
 	"github.com/masterwok/sohps/internal/report"
 	"github.com/masterwok/sohps/internal/scanner"
@@ -30,6 +31,7 @@ func main() {
 
 	report.Init(args.Verbose, args.NoColor)
 
+	fs.RootPath = args.RootPath
 	audit.CheckSystemPreload(args.RootPath)
 
 	info, err := os.Stat(args.TargetPath)
@@ -41,7 +43,7 @@ func main() {
 		args.IsDirectoryScan = true
 		fmt.Printf("%s[*] Scanning %s...%s\n", report.Yellow, args.TargetPath, report.Reset)
 
-		targetFiles, err := scanner.DiscoverBinaries(args.TargetPath)
+		targetFiles, err := scanner.DiscoverBinaries(args.TargetPath, args.RootPath)
 		if err != nil {
 			report.PrintErrorAndExit(err)
 		}
@@ -111,8 +113,8 @@ func processBinary(path string, args *Args) {
 		return
 	}
 
-	rawPaths := elfparser.ExtractRawSearchPaths(f, args.LDLibraryPath)
-	candidates := hijack.Analyze(rawPaths, libs, path, f.Machine.String())
+	rawPaths := elfparser.ExtractRawSearchPaths(f, args.LDLibraryPath, args.RootPath)
+	candidates := hijack.Analyze(rawPaths, libs, path, f.Machine.String(), args.RootPath)
 
 	hasFindings := false
 	for _, c := range candidates {

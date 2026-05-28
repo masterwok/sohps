@@ -7,9 +7,9 @@ import (
 	"github.com/masterwok/sohps/internal/fs"
 )
 
-func Analyze(rawPaths []string, libs []string, targetPath string, machineType string) []*HijackCandidate {
+func Analyze(rawPaths []string, libs []string, targetPath string, machineType string, root string) []*HijackCandidate {
 	isSecure := fs.IsATSecure(targetPath)
-	searchPaths := buildSearchPaths(rawPaths, targetPath, isSecure, machineType)
+	searchPaths := buildSearchPaths(rawPaths, targetPath, isSecure, machineType, root)
 	hijackCandidates := []*HijackCandidate{}
 
 	for _, lib := range libs {
@@ -22,6 +22,14 @@ func Analyze(rawPaths []string, libs []string, targetPath string, machineType st
 					resolvedLib = abs
 				}
 			}
+
+			// Prefix with root if it's an absolute path and not already prefixed.
+			if filepath.IsAbs(resolvedLib) && root != "/" && root != "" {
+				if !strings.HasPrefix(resolvedLib, root) {
+					resolvedLib = filepath.Join(root, resolvedLib)
+				}
+			}
+
 			hijackCandidates = append(hijackCandidates, checkAbsPathLib(resolvedLib))
 		} else {
 			hijackCandidates = append(hijackCandidates, checkSearchPathLib(searchPaths, lib, machineType)...)

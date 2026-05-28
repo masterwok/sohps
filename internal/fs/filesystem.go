@@ -33,11 +33,11 @@ func IsATSecure(path string) bool {
 	return mode&os.ModeSetuid != 0 || mode&os.ModeSetgid != 0
 }
 
-var TestRoot string
+var RootPath string
 
 // FindWritableParent walks up the directory tree from the given path.
 // It returns the first directory that is writable, or an empty string if none are found.
-// It stops when it reaches the root directory.
+// It stops when it reaches the root directory or the configured RootPath.
 func FindWritableParent(targetPath string) (string, bool) {
 	dir := targetPath
 
@@ -49,9 +49,8 @@ func FindWritableParent(targetPath string) (string, bool) {
 			break
 		}
 		
-		// Do not evaluate the test root itself as a writable parent,
-		// as it is always writable in Go tests.
-		if TestRoot != "" && len(parent) <= len(TestRoot) {
+		// Do not evaluate the configured root itself (or anything above it) as a writable parent.
+		if RootPath != "" && RootPath != "/" && len(parent) <= len(RootPath) {
 			break
 		}
 

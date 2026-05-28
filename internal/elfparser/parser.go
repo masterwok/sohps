@@ -4,6 +4,7 @@ package elfparser
 import (
 	"debug/elf"
 	"fmt"
+	"path/filepath"
 	"strings"
 )
 
@@ -39,7 +40,7 @@ func GetHandle(targetPath string) (*elf.File, error) {
 
 // ExtractRawSearchPaths extracts dynamic library search paths from an ELF binary.
 // It prioritizes DT_RUNPATH over DT_RPATH, and injects LD_LIBRARY_PATH context if provided.
-func ExtractRawSearchPaths(f *elf.File, ldLibraryPath string) []string {
+func ExtractRawSearchPaths(f *elf.File, ldLibraryPath string, root string) []string {
 	var searchPaths []string
 	hasRunpath := false
 
@@ -85,14 +86,19 @@ func ExtractRawSearchPaths(f *elf.File, ldLibraryPath string) []string {
 
 	// 4. Dynamically build system fallback paths based on the target machine's config
 	// Note: ld.so checks ld.so.conf paths BEFORE the hardcoded system defaults!
-	systemPaths := parseLdConf("/etc/ld.so.conf", nil)
+	systemPaths := parseLdConf(filepath.Join(root, "etc", "ld.so.conf"), nil)
 
 	// Determine architecture-specific system defaults
+	var defaults []string
 	switch f.Machine {
 	case elf.EM_X86_64, elf.EM_AARCH64:
-		systemPaths = append(systemPaths, "/lib64", "/usr/lib64", "/lib", "/usr/lib")
+		defaults = []string{"/lib64", "/usr/lib64", "/lib", "/usr/lib"}
 	default:
-		systemPaths = append(systemPaths, "/lib", "/usr/lib")
+		defaults = []string{"/lib", "/usr/lib"}
+	}
+
+	for _, d := range defaults {
+		systemPaths = append(systemPaths, filepath.Join(root, d))
 	}
 
 	return append(searchPaths, systemPaths...)

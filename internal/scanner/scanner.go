@@ -7,7 +7,7 @@ import (
 )
 
 // DiscoverBinaries walks the target directory and returns a slice of unique ELF binary paths.
-func DiscoverBinaries(targetPath string) ([]string, error) {
+func DiscoverBinaries(targetPath string, root string) ([]string, error) {
 	var targetFiles []string
 	seen := make(map[string]bool)
 
@@ -21,11 +21,17 @@ func DiscoverBinaries(targetPath string) ([]string, error) {
 			name := d.Name()
 			
 			// 1. Skip specifically excluded system directories if they are at the root.
-			// We check both absolute path and ensure it's at the top level.
+			// We check both absolute path and ensure it's at the top level of the configured root.
 			abs, _ := filepath.Abs(path)
-			if abs == "/proc" || abs == "/sys" || abs == "/dev" || 
-			   abs == "/run" || abs == "/snap" || abs == "/var/lib/lxcfs" {
-				return filepath.SkipDir
+			
+			// Virtual directories to prune
+			pruneDirs := []string{"/proc", "/sys", "/dev", "/run", "/snap", "/var/lib/lxcfs"}
+			
+			for _, p := range pruneDirs {
+				// Match either the system path or the rootfs-prefixed path
+				if abs == p || abs == filepath.Join(root, p) {
+					return filepath.SkipDir
+				}
 			}
 
 			// 2. Skip hidden directories (e.g., .git) unless the scan started there

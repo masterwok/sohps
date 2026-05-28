@@ -34,7 +34,7 @@ func getHWCAPPaths(basePath, machineType string) []string {
 // expanding linker macros and resolving relative traversals.
 // If isSecure is true (SUID/SGID), it mimics ld.so AT_SECURE behavior by
 // dropping $ORIGIN and relative paths.
-func buildSearchPaths(rawPaths []string, targetBinary string, isSecure bool, machineType string) []SearchPath {
+func buildSearchPaths(rawPaths []string, targetBinary string, isSecure bool, machineType string, root string) []SearchPath {
 	var searchPaths []SearchPath
 
 	// ld.so resolves $ORIGIN relative to the binary's actual location.
@@ -117,6 +117,18 @@ func buildSearchPaths(rawPaths []string, targetBinary string, isSecure bool, mac
 		absPath, err := filepath.Abs(resolved)
 		if err == nil {
 			resolved = absPath
+		}
+
+		// Prefix with root if it's an absolute path and not already prefixed.
+		// We use a simple check to see if the path is absolute.
+		// If it is absolute, it's a system-wide path (or resolved $ORIGIN).
+		// We want to make sure it's evaluated relative to the provided root.
+		if filepath.IsAbs(resolved) && root != "/" && root != "" {
+			// If the path already starts with the root, we don't want to double-prefix it.
+			// This can happen with $ORIGIN if the target binary was already absolute.
+			if !strings.HasPrefix(resolved, root) {
+				resolved = filepath.Join(root, resolved)
+			}
 		}
 
 		// Clean the path, but evaluate symlinks to mirror real OS behavior.

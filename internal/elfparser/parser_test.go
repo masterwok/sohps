@@ -41,7 +41,7 @@ func TestExtractRawSearchPaths(t *testing.T) {
 		}
 		defer f.Close()
 
-		return ExtractRawSearchPaths(f, "")
+		return ExtractRawSearchPaths(f, "", "/")
 	}
 
 	t.Run("DT_RUNPATH is extracted", func(t *testing.T) {

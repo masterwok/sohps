@@ -67,7 +67,7 @@ func TestDiscoverBinaries(t *testing.T) {
 	bin3 := filepath.Join(hiddenDir, "bin3.elf")
 	os.WriteFile(bin3, []byte("\x7fELF3"), 0755)
 
-	results, err := DiscoverBinaries(tmp)
+	results, err := DiscoverBinaries(tmp, "/")
 	if err != nil {
 		t.Fatalf("DiscoverBinaries failed: %v", err)
 	}

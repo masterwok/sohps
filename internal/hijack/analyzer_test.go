@@ -106,8 +106,8 @@ func TestEvaluateHijackVector(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tmp := t.TempDir()
 			
-			fs.TestRoot = tmp
-			defer func() { fs.TestRoot = "" }()
+			fs.RootPath = tmp
+			defer func() { fs.RootPath = "" }()
 
 			target, dir, exists := tc.setup(tmp)
 
@@ -190,6 +190,16 @@ func TestBuildSearchPaths(t *testing.T) {
 			rawPaths: []string{"/opt/app/$LIB/$PLATFORM"},
 			expected: []SearchPath{{Raw: "/opt/app/$LIB/$PLATFORM", Resolved: "/opt/app/lib64/x86_64"}},
 		},
+		{
+			name:     "Prefixes absolute paths with root",
+			rawPaths: []string{"/usr/lib"},
+			expected: []SearchPath{{Raw: "/usr/lib", Resolved: "ROOTFS/usr/lib"}},
+			setup: func(dir string) string {
+				root := filepath.Join(dir, "rootfs")
+				os.MkdirAll(filepath.Join(root, "usr/lib"), 0755)
+				return root
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -197,13 +207,19 @@ func TestBuildSearchPaths(t *testing.T) {
 			tmp := t.TempDir()
 			target := targetBinary
 			realDir := ""
+			root := "/"
 
 			if tc.setup != nil {
-				target = tc.setup(tmp)
-				realDir = filepath.Join(tmp, "real")
+				setupResult := tc.setup(tmp)
+				if tc.name == "Prefixes absolute paths with root" {
+					root = setupResult
+				} else {
+					target = setupResult
+					realDir = filepath.Join(tmp, "real")
+				}
 			}
 
-			result := buildSearchPaths(tc.rawPaths, target, false, "EM_X86_64")
+			result := buildSearchPaths(tc.rawPaths, target, false, "EM_X86_64", root)
 
 			if len(result) != len(tc.expected) {
 				t.Fatalf("expected %d paths, got %d", len(tc.expected), len(result))
@@ -217,6 +233,9 @@ func TestBuildSearchPaths(t *testing.T) {
 				expectedResolved := tc.expected[i].Resolved
 				if realDir != "" {
 					expectedResolved = strings.ReplaceAll(expectedResolved, "REAL_DIR", realDir)
+				}
+				if root != "/" {
+					expectedResolved = strings.ReplaceAll(expectedResolved, "ROOTFS", root)
 				}
 
 				if path.Resolved != expectedResolved {
@@ -241,7 +260,7 @@ func TestBuildSearchPathsATSecure(t *testing.T) {
 		{Raw: "/opt/trusted/lib", Resolved: "/opt/trusted/lib"},
 	}
 
-	result := buildSearchPaths(rawPaths, targetBinary, true, "EM_X86_64")
+	result := buildSearchPaths(rawPaths, targetBinary, true, "EM_X86_64", "/")
 
 	if len(result) != len(expected) {
 		t.Fatalf("AT_SECURE filter failed: expected %d paths, got %d", len(expected), len(result))
@@ -257,8 +276,8 @@ func TestBuildSearchPathsATSecure(t *testing.T) {
 func TestCheckSearchPathLib(t *testing.T) {
 	tmp := t.TempDir()
 	
-	fs.TestRoot = tmp
-	defer func() { fs.TestRoot = "" }()
+	fs.RootPath = tmp
+	defer func() { fs.RootPath = "" }()
 	
 	// Setup:
 	// 1. /tmp/dir1 (Writable, No file)
