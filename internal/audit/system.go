@@ -1,35 +1,44 @@
 package audit
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"github.com/masterwok/sohps/internal/fs"
-	"github.com/masterwok/sohps/internal/report"
+	"github.com/masterwok/sohps/internal/hijack"
 )
 
 // CheckSystemPreload evaluates the global ld.so.preload file for vulnerabilities relative to a root path.
-func CheckSystemPreload(root string) {
+func CheckSystemPreload(root string) []*hijack.HijackCandidate {
 	preloadPath := filepath.Join(root, "etc", "ld.so.preload")
 	etcDir := filepath.Join(root, "etc")
-	RunPreloadAudit(preloadPath, etcDir)
+	return RunPreloadAudit(preloadPath, etcDir)
 }
 
 // RunPreloadAudit performs the actual check on the specified paths.
-func RunPreloadAudit(preloadPath, etcDir string) {
+func RunPreloadAudit(preloadPath, etcDir string) []*hijack.HijackCandidate {
+	var candidates []*hijack.HijackCandidate
+
 	if fs.FileExists(preloadPath) && fs.IsWritable(preloadPath) {
-		report.PrintTarget(preloadPath)
-		fmt.Printf("    %s%s[!] System Preload%s\n", report.Red, report.Bold, report.Reset)
-		fmt.Printf("    %-15s : %s\n", "Vulnerable Path", preloadPath)
-		fmt.Printf("    %-15s : %s\n", "Resolved Dir", preloadPath)
-		fmt.Printf("    %-15s : PRELOAD INJECT: Append malicious payload path directly to %s\n\n", "Action", preloadPath)
+		candidates = append(candidates, &hijack.HijackCandidate{
+			Category:    "System Preload",
+			RawRunPath:  preloadPath,
+			ResolvedDir: preloadPath,
+			Action:      "PRELOAD INJECT: Append malicious payload path directly to " + preloadPath,
+			Library:     "ld.so.preload",
+			CanHijack:   true,
+		})
 	}
 
 	if !fs.FileExists(preloadPath) && fs.IsWritable(etcDir) {
-		report.PrintTarget(preloadPath)
-		fmt.Printf("    %s%s[!] System Preload%s\n", report.Red, report.Bold, report.Reset)
-		fmt.Printf("    %-15s : %s\n", "Vulnerable Path", preloadPath)
-		fmt.Printf("    %-15s : %s (Missing)\n", "Resolved Dir", etcDir)
-		fmt.Printf("    %-15s : PRELOAD CREATE: Create %s and add malicious payload path\n\n", "Action", preloadPath)
+		candidates = append(candidates, &hijack.HijackCandidate{
+			Category:    "System Preload",
+			RawRunPath:  preloadPath,
+			ResolvedDir: etcDir + " (Missing)",
+			Action:      "PRELOAD CREATE: Create " + preloadPath + " and add malicious payload path",
+			Library:     "ld.so.preload",
+			CanHijack:   true,
+		})
 	}
+
+	return candidates
 }

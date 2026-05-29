@@ -34,7 +34,12 @@ func DiscoverBinaries(targetPath string, root string) ([]string, error) {
 				}
 			}
 
-			// 2. Skip hidden directories (e.g., .git) unless the scan started there
+			// 2. Skip temporary directories created by the tool itself
+			if strings.HasPrefix(name, "sohps_appimage_") {
+				return filepath.SkipDir
+			}
+
+			// 3. Skip hidden directories (e.g., .git) unless the scan started there
 			if strings.HasPrefix(name, ".") && path != targetPath {
 				return filepath.SkipDir
 			}

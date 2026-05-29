@@ -52,5 +52,5 @@ func evaluateMissingFileVector(targetPath, dirPath string) (bool, string) {
 		return true, action
 	}
 
-	return false, ""
+	return false, "SAFE: Library is missing, but directory is not writable."
 }

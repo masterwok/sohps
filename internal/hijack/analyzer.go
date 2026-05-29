@@ -7,32 +7,32 @@ import (
 	"github.com/masterwok/sohps/internal/fs"
 )
 
-func Analyze(rawPaths []string, libs []string, targetPath string, machineType string, root string) []*HijackCandidate {
-	isSecure := fs.IsATSecure(targetPath)
-	searchPaths := buildSearchPaths(rawPaths, targetPath, isSecure, machineType, root)
+func Analyze(rawPaths []SearchPath, directLibs []string, transitiveLibs []string, proxyReqMap map[string]bool, targetPath string, machineType string, root string) []*HijackCandidate {
 	hijackCandidates := []*HijackCandidate{}
 
-	for _, lib := range libs {
-		// If a DT_NEEDED entry contains a '/', ld.so treats it as a direct path
-		// (either absolute or relative to CWD) and bypasses all search paths.
+	// Evaluate Direct Dependencies (Subject to RUNPATH/RPATH)
+	for _, lib := range directLibs {
 		if strings.Contains(lib, "/") {
-			resolvedLib := lib
-			if !filepath.IsAbs(lib) {
-				if abs, err := filepath.Abs(lib); err == nil {
-					resolvedLib = abs
-				}
-			}
-
-			// Prefix with root if it's an absolute path and not already prefixed.
-			if filepath.IsAbs(resolvedLib) && root != "/" && root != "" {
-				if !strings.HasPrefix(resolvedLib, root) {
-					resolvedLib = filepath.Join(root, resolvedLib)
-				}
-			}
-
-			hijackCandidates = append(hijackCandidates, checkAbsPathLib(resolvedLib))
+			hijackCandidates = append(hijackCandidates, checkAbsPathLib(lib, "Direct", proxyReqMap[lib], root))
 		} else {
-			hijackCandidates = append(hijackCandidates, checkSearchPathLib(searchPaths, lib, machineType)...)
+			hijackCandidates = append(hijackCandidates, checkSearchPathLib(rawPaths, lib, machineType, "Direct", proxyReqMap[lib])...)
+		}
+	}
+
+	// Evaluate Transitive Dependencies (Only subject to system-wide paths and RPATH, but we skip RUNPATH here)
+	// We extract only the system paths from rawPaths to evaluate transitive dependencies correctly.
+	systemPaths := []SearchPath{}
+	for _, p := range rawPaths {
+		if filepath.IsAbs(p.Raw) && !strings.Contains(p.Raw, "$ORIGIN") {
+			systemPaths = append(systemPaths, p)
+		}
+	}
+
+	for _, lib := range transitiveLibs {
+		if strings.Contains(lib, "/") {
+			hijackCandidates = append(hijackCandidates, checkAbsPathLib(lib, "Transitive", proxyReqMap[lib], root))
+		} else {
+			hijackCandidates = append(hijackCandidates, checkSearchPathLib(systemPaths, lib, machineType, "Transitive", proxyReqMap[lib])...)
 		}
 	}
 
@@ -41,18 +41,26 @@ func Analyze(rawPaths []string, libs []string, targetPath string, machineType st
 
 // huntSearchPathLib iterates through the dynamic linker's search paths.
 // It returns a slice of all viable hijack candidates found along the route.
-func checkSearchPathLib(searchPaths []SearchPath, libName string, machineType string) []*HijackCandidate {
+func checkSearchPathLib(searchPaths []SearchPath, libName string, machineType string, depType string, proxyRequired bool) []*HijackCandidate {
 	var candidates []*HijackCandidate
 
 	for _, path := range searchPaths {
 		if path.Resolved == "CWD_HIJACK_VECTOR" {
+			// RUNPATH is non-transitive! If we are evaluating a transitive library
+			// against an empty RUNPATH from the main binary, it is a false positive.
+			if depType == "Transitive" {
+				continue
+			}
+
 			candidate := &HijackCandidate{
-				Library:     libName,
-				Category:    "Implicit CWD",
-				RawRunPath:  path.Raw,
-				ResolvedDir: "Runtime Current Working Directory",
-				CanHijack:   true,
-				Action:      "CWD HIJACK: Execute binary from an attacker-controlled writable directory containing a malicious payload.",
+				Library:        libName,
+				Category:       "Implicit CWD",
+				RawRunPath:     path.Raw,
+				ResolvedDir:    "Runtime Current Working Directory",
+				CanHijack:      true,
+				Action:         "CWD HIJACK: Execute binary from an attacker-controlled writable directory containing a malicious payload.",
+				DependencyType: depType,
+				ProxyRequired:  proxyRequired,
 			}
 			candidates = append(candidates, candidate)
 			continue
@@ -87,14 +95,16 @@ func checkSearchPathLib(searchPaths []SearchPath, libName string, machineType st
 			// The file exists in this segment. Evaluate ONLY this path.
 			fullPath := filepath.Join(existingPath, libName)
 			candidate := &HijackCandidate{
-				Library:     libName,
-				Category:    category,
-				RawRunPath:  path.Raw,
-				ResolvedDir: existingPath,
+				Library:        libName,
+				Category:       category,
+				RawRunPath:     path.Raw,
+				ResolvedDir:    existingPath,
+				DependencyType: depType,
+				ProxyRequired:  proxyRequired,
 			}
 			
 			candidate.CanHijack, candidate.Action = evaluateHijackVector(fullPath, existingPath, true)
-			
+
 			if candidate.CanHijack {
 				candidates = append(candidates, candidate)
 			}
@@ -107,10 +117,12 @@ func checkSearchPathLib(searchPaths []SearchPath, libName string, machineType st
 		for _, hwcapDir := range hwcapPaths {
 			fullPath := filepath.Join(hwcapDir, libName)
 			candidate := &HijackCandidate{
-				Library:     libName,
-				Category:    category,
-				RawRunPath:  path.Raw,
-				ResolvedDir: hwcapDir,
+				Library:        libName,
+				Category:       category,
+				RawRunPath:     path.Raw,
+				ResolvedDir:    hwcapDir,
+				DependencyType: depType,
+				ProxyRequired:  proxyRequired,
 			}
 
 			candidate.CanHijack, candidate.Action = evaluateHijackVector(fullPath, hwcapDir, false)
@@ -128,18 +140,28 @@ func checkSearchPathLib(searchPaths []SearchPath, libName string, machineType st
 
 // checkAbsPathLib evaluates an absolute path to a shared library and determines
 // if the path or its parent directory is vulnerable to hijacking.
-func checkAbsPathLib(libPath string) *HijackCandidate {
-	targetDir := filepath.Dir(libPath)
-	fileExists := fs.FileExists(libPath)
-
-	candidate := HijackCandidate{
-		Library:     libPath,
-		Category:    "Absolute Path",
-		RawRunPath:  "Hardcoded Absolute Path",
-		ResolvedDir: targetDir,
+func checkAbsPathLib(libPath string, depType string, proxyRequired bool, root string) *HijackCandidate {
+	resolvedLib := libPath
+	// Prefix with root if it's an absolute path and not already prefixed.
+	if filepath.IsAbs(libPath) && root != "/" && root != "" {
+		if !strings.HasPrefix(libPath, root) {
+			resolvedLib = filepath.Join(root, libPath)
+		}
 	}
 
-	candidate.CanHijack, candidate.Action = evaluateHijackVector(libPath, targetDir, fileExists)
+	targetDir := filepath.Dir(resolvedLib)
+	fileExists := fs.FileExists(resolvedLib)
+
+	candidate := HijackCandidate{
+		Library:        libPath,
+		Category:       "Absolute Path",
+		RawRunPath:     "Hardcoded Absolute Path",
+		ResolvedDir:    targetDir,
+		DependencyType: depType,
+		ProxyRequired:  proxyRequired,
+	}
+
+	candidate.CanHijack, candidate.Action = evaluateHijackVector(resolvedLib, targetDir, fileExists)
 
 	return &candidate
 }

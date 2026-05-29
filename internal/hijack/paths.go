@@ -30,11 +30,11 @@ func getHWCAPPaths(basePath, machineType string) []string {
 	}
 }
 
-// buildSearchPaths takes a list of raw paths and the target binary path,
+// BuildSearchPaths takes a list of raw paths and the target binary path,
 // expanding linker macros and resolving relative traversals.
 // If isSecure is true (SUID/SGID), it mimics ld.so AT_SECURE behavior by
 // dropping $ORIGIN and relative paths.
-func buildSearchPaths(rawPaths []string, targetBinary string, isSecure bool, machineType string, root string) []SearchPath {
+func BuildSearchPaths(rawPaths []string, targetBinary string, isSecure bool, machineType string, root string) []SearchPath {
 	var searchPaths []SearchPath
 
 	// ld.so resolves $ORIGIN relative to the binary's actual location.

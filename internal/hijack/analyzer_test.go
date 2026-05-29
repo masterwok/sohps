@@ -219,7 +219,7 @@ func TestBuildSearchPaths(t *testing.T) {
 				}
 			}
 
-			result := buildSearchPaths(tc.rawPaths, target, false, "EM_X86_64", root)
+			result := BuildSearchPaths(tc.rawPaths, target, false, "EM_X86_64", root)
 
 			if len(result) != len(tc.expected) {
 				t.Fatalf("expected %d paths, got %d", len(tc.expected), len(result))
@@ -260,7 +260,7 @@ func TestBuildSearchPathsATSecure(t *testing.T) {
 		{Raw: "/opt/trusted/lib", Resolved: "/opt/trusted/lib"},
 	}
 
-	result := buildSearchPaths(rawPaths, targetBinary, true, "EM_X86_64", "/")
+	result := BuildSearchPaths(rawPaths, targetBinary, true, "EM_X86_64", "/")
 
 	if len(result) != len(expected) {
 		t.Fatalf("AT_SECURE filter failed: expected %d paths, got %d", len(expected), len(result))
@@ -307,7 +307,7 @@ func TestCheckSearchPathLib(t *testing.T) {
 		{Raw: "dir3", Resolved: dir3},
 	}
 
-	candidates := checkSearchPathLib(searchPaths, libName, "EM_X86_64")
+	candidates := checkSearchPathLib(searchPaths, libName, "EM_X86_64", "Direct", false)
 
 	// We expect exactly ONE candidate now because we fixed the HWCAP alert flood.
 	// The tool should only report the highest-priority HWCAP subdir for dir1.

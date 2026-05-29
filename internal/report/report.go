@@ -3,6 +3,7 @@ package report
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/masterwok/sohps/internal/hijack"
@@ -74,27 +75,99 @@ func PrintSafeTarget(path string) {
 // PrintFindings formats and displays verified privilege escalation candidates.
 func PrintFindings(candidates []*hijack.HijackCandidate) {
 	type groupKey struct {
-		raw      string
+		category string
 		resolved string
 		action   string
 	}
-	groups := make(map[groupKey][]string)
-	categories := make(map[groupKey]string)
+	
+	type libInfo struct {
+		name          string
+		depType       string
+		proxyRequired bool
+		isEnvVar      bool
+	}
+
+	groups := make(map[groupKey][]libInfo)
+	rawPaths := make(map[groupKey]map[string]bool)
 
 	for _, c := range candidates {
 		if !c.CanHijack {
 			continue
 		}
-		key := groupKey{c.RawRunPath, c.ResolvedDir, c.Action}
-		groups[key] = append(groups[key], c.Library)
-		categories[key] = c.Category
+		key := groupKey{c.Category, c.ResolvedDir, c.Action}
+		
+		// Add library if not already in this group
+		found := false
+		for _, l := range groups[key] {
+			if l.name == c.Library {
+				found = true
+				break
+			}
+		}
+		if !found {
+			groups[key] = append(groups[key], libInfo{c.Library, c.DependencyType, c.ProxyRequired, c.IsEnvVar})
+		}
+
+		// Track unique raw paths for this group
+		if rawPaths[key] == nil {
+			rawPaths[key] = make(map[string]bool)
+		}
+		rawPaths[key][c.RawRunPath] = true
 	}
 
 	for key, libs := range groups {
-		fmt.Printf("    %s%s[!] %s%s\n", Red, Bold, categories[key], Reset)
-		fmt.Printf("    %-15s : %s\n", "Vulnerable Path", key.raw)
+		paths := []string{}
+		for p := range rawPaths[key] {
+			paths = append(paths, p)
+		}
+
+		// Sort libraries: Constructor Injection first, then Direct first, then alphabetical
+		sort.Slice(libs, func(i, j int) bool {
+			if libs[i].proxyRequired != libs[j].proxyRequired {
+				return !libs[i].proxyRequired
+			}
+			if libs[i].depType != libs[j].depType {
+				return libs[i].depType == "Direct"
+			}
+			return libs[i].name < libs[j].name
+		})
+
+		var constructorTagPrinted bool
+		var proxyTagPrinted bool
+		isEnvVarGroup := false
+
+		formattedLibs := make([]string, len(libs))
+		for i, l := range libs {
+			if l.isEnvVar {
+				isEnvVarGroup = true
+				formattedLibs[i] = l.name
+				continue
+			}
+
+			tag := ""
+			if l.proxyRequired {
+				if !proxyTagPrinted {
+					tag = " (Proxy Required)"
+					proxyTagPrinted = true
+				}
+			} else {
+				if !constructorTagPrinted {
+					tag = " (Constructor Injection)"
+					constructorTagPrinted = true
+				}
+			}
+			formattedLibs[i] = fmt.Sprintf("%s%s", l.name, tag)
+		}
+
+		label := "Libraries"
+		if isEnvVarGroup {
+			label = "Variables"
+		}
+
+		fmt.Printf("    %s%s[!] %s%s\n", Red, Bold, key.category, Reset)
+		fmt.Printf("    %-15s : %s\n", "Vulnerable Path", strings.Join(paths, ", "))
 		fmt.Printf("    %-15s : %s\n", "Resolved Dir", key.resolved)
 		fmt.Printf("    %-15s : %s\n", "Action", key.action)
-		fmt.Printf("    %-15s : %s\n\n", fmt.Sprintf("Libraries (%d)", len(libs)), strings.Join(libs, ", "))
+		fmt.Printf("    %-15s : %s\n\n", fmt.Sprintf("%s (%d)", label, len(libs)), strings.Join(formattedLibs, "\n                      "))
 	}
 }

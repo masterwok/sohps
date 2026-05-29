@@ -27,12 +27,21 @@ type Args struct {
 }
 
 func main() {
-	args := parseArgs()
+	args, err := parseArgs()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
 
 	report.Init(args.Verbose, args.NoColor)
 
 	fs.RootPath = args.RootPath
-	audit.CheckSystemPreload(args.RootPath)
+	globalCandidates := audit.CheckSystemPreload(args.RootPath)
+	if len(globalCandidates) > 0 {
+		report.PrintTarget("Global System Audit")
+		report.PrintFindings(globalCandidates)
+	}
 
 	info, err := os.Stat(args.TargetPath)
 	if err != nil {
@@ -102,19 +111,62 @@ func main() {
 }
 
 func processBinary(path string, args *Args) {
+	var candidates []*hijack.HijackCandidate
+	
 	f, err := elfparser.GetHandle(path)
 	if err != nil {
 		return
 	}
 	defer f.Close()
 
-	libs, err := elfparser.GetRequiredLibraries(f)
+	// 1. Extract direct dependencies
+	directLibs, err := elfparser.GetRequiredLibraries(f)
 	if err != nil {
-		return
+		directLibs = []string{}
 	}
 
+	// 2. Resolve all transitive dependencies
+	allLibsMap, proxyReqMap, err := elfparser.ResolveTransitiveDependencies(path, directLibs, nil, args.LDLibraryPath, args.RootPath)
+	if err != nil {
+		allLibsMap = make(map[string]string)
+		for _, l := range directLibs {
+			allLibsMap[l] = ""
+		}
+		proxyReqMap = make(map[string]bool)
+	}
+
+	// Calculate transitive-only libraries (allLibs - directLibs)
+	directMap := make(map[string]bool)
+	for _, l := range directLibs {
+		directMap[l] = true
+	}
+
+	var transitiveLibs []string
+	for l := range allLibsMap {
+		if !directMap[l] {
+			transitiveLibs = append(transitiveLibs, l)
+		}
+	}
+
+	// 3. Check for Container Runtime vulnerabilities (e.g. AppImage)
+	if elfparser.IsAppImage(path) {
+		offset := elfparser.GetAppImageOffset(path)
+		if offset > 0 {
+			var allLibsList []string
+			for l := range allLibsMap {
+				allLibsList = append(allLibsList, l)
+			}
+			candidates = append(candidates, audit.AuditAppImage(path, offset, allLibsList)...)
+		}
+	}
+
+	// 4. ELF Analysis
 	rawPaths := elfparser.ExtractRawSearchPaths(f, args.LDLibraryPath, args.RootPath)
-	candidates := hijack.Analyze(rawPaths, libs, path, f.Machine.String(), args.RootPath)
+	// We need to pass the machine type and root correctly
+	hijackSearchPaths := hijack.BuildSearchPaths(rawPaths, path, fs.IsATSecure(path), f.Machine.String(), args.RootPath)
+	
+	elfCandidates := hijack.Analyze(hijackSearchPaths, directLibs, transitiveLibs, proxyReqMap, path, f.Machine.String(), args.RootPath)
+	candidates = append(candidates, elfCandidates...)
 
 	hasFindings := false
 	for _, c := range candidates {
@@ -141,7 +193,8 @@ func processBinary(path string, args *Args) {
 	}
 }
 
-func parseArgs() *Args {
+func parseArgs() (*Args, error) {
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	ldPath := flag.String("ld-path", "", "Simulate LD_LIBRARY_PATH environment variable (colon-separated)")
 	rootPath := flag.String("root", "/", "Specify base system root for global audits (e.g. /etc/ld.so.preload)")
 	verbose := flag.Bool("v", false, "Enable verbose output (print safe targets)")
@@ -152,11 +205,7 @@ func parseArgs() *Args {
 	args := flag.Args()
 
 	if len(args) != 1 {
-		fmt.Printf("SOHPS: Shared Object Hijack Path Scanner\n\n")
-		fmt.Printf("Usage: %s [-v] [-nc] [--root <path>] [--ld-path <paths>] <target_binary_or_dir>\n\n", os.Args[0])
-		fmt.Printf("Flags:\n")
-		flag.PrintDefaults()
-		os.Exit(1)
+		return nil, fmt.Errorf("SOHPS: Shared Object Hijack Path Scanner\n\nUsage: %s [-v] [-nc] [--root <path>] [--ld-path <paths>] <target_binary_or_dir>\n\nFlags:\n%s", os.Args[0], getFlagDefaults())
 	}
 
 	return &Args{
@@ -165,5 +214,13 @@ func parseArgs() *Args {
 		RootPath:      *rootPath,
 		Verbose:       *verbose,
 		NoColor:       *noColor,
-	}
+	}, nil
+}
+
+func getFlagDefaults() string {
+	var output string
+	flag.CommandLine.VisitAll(func(f *flag.Flag) {
+		output += fmt.Sprintf("  -%s=%s: %s\n", f.Name, f.DefValue, f.Usage)
+	})
+	return output
 }
