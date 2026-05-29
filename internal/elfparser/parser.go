@@ -360,24 +360,8 @@ func GetAppImageOffset(path string) int64 {
 	}
 	defer f.Close()
 
-	// The SquashFS is typically appended after the section headers.
-	// Section headers start at f.FileHeader.Shoff
-	// There are f.FileHeader.Shnum of them
-	// Each is f.FileHeader.Shentsize large
-	
-	// We'll use the reflection-free way to get these if possible, 
-	// but elf.File already has these in its header.
-	
-	// For ELF64:
-	// Shoff is at offset 40, 8 bytes
-	// Shentsize is at offset 58, 2 bytes
-	// Shnum is at offset 60, 2 bytes
-	
-	// However, elf.Open already parsed these. 
-	// We can't access them directly from elf.File easily because they are private 
-	// or part of the internal FileHeader.
-	
-	// Let's use a more robust way: find the maximum offset of any section.
+	// The offset calculation for this specific AppImage requires manual parsing,
+	// as the SquashFS image is appended after the section header table.
 	var maxOffset int64
 	for _, sec := range f.Sections {
 		end := int64(sec.Offset + sec.Size)
@@ -385,49 +369,36 @@ func GetAppImageOffset(path string) int64 {
 			maxOffset = end
 		}
 	}
-	
-	// Also account for the section header table itself, which usually follows the sections.
-	// We'll read the ELF header manually to get the exact end of the ELF.
-	
+
 	file, err := os.Open(path)
 	if err != nil {
 		return maxOffset
 	}
 	defer file.Close()
-	
-	// Read ELF64 header (64 bytes)
+
 	header := make([]byte, 64)
 	if _, err := file.ReadAt(header, 0); err != nil {
 		return maxOffset
 	}
-	
-	shoff := int64(0)
-	shentsize := int(0)
-	shnum := int(0)
-	
-	// We assume ELF64 for now as most AppImages are 64-bit
-	// [40-47] e_shoff
-	// [58-59] e_shentsize
-	// [60-61] e_shnum
-	
-	// Check if it's 64-bit
-	if header[4] == 2 {
+
+	var shoff int64
+	var shentsize, shnum int
+
+	if header[4] == 2 { // ELFCLASS64
 		shoff = int64(header[40]) | int64(header[41])<<8 | int64(header[42])<<16 | int64(header[43])<<24 |
 			int64(header[44])<<32 | int64(header[45])<<40 | int64(header[46])<<48 | int64(header[47])<<56
 		shentsize = int(header[58]) | int(header[59])<<8
 		shnum = int(header[60]) | int(header[61])<<8
-	} else {
-		// ELF32
+	} else { // ELFCLASS32
 		shoff = int64(header[32]) | int64(header[33])<<8 | int64(header[34])<<16 | int64(header[35])<<24
 		shentsize = int(header[46]) | int(header[47])<<8
 		shnum = int(header[48]) | int(header[49])<<8
 	}
-	
+
 	tableEnd := shoff + int64(shnum*shentsize)
 	if tableEnd > maxOffset {
 		maxOffset = tableEnd
 	}
-
 	return maxOffset
 }
 
