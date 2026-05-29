@@ -1,6 +1,6 @@
 # sohps: Shared Object Hijack Path Scanner
 
-`sohps` is a security auditing tool designed to identify privilege escalation vectors within Linux ELF binaries. By accurately simulating the behavior of the Linux dynamic linker (`ld.so`), `sohps` maps how binaries resolve their shared object dependencies and uncovers vulnerabilities introduced by insecure search paths, writable directories, or misconfigured environments.
+`sohps` is a security auditing tool designed to identify privilege escalation vectors within Linux ELF binaries and AppImage containers. By accurately simulating the behavior of the Linux dynamic linker (`ld.so`), `sohps` maps how binaries resolve their shared object dependencies and uncovers vulnerabilities introduced by insecure search paths, writable directories, or misconfigured environments.
 
 ---
 
@@ -11,6 +11,7 @@
 | Category | Description |
 | :--- | :--- |
 | **Implicit CWD** | Triggered by empty entries in `RPATH` or `RUNPATH` (e.g., a trailing colon). The linker falls back to the Current Working Directory, allowing an attacker to drop a malicious library. |
+| **Environment Poisoning** | Triggered by insecure script wrappers (e.g., in AppImages) that blindly append to `LD_LIBRARY_PATH`. If the environment variable is unset, the trailing colon falls back to the CWD. |
 | **$ORIGIN Hijack** | Vulnerabilities within directories resolved via the `$ORIGIN` macro. If the binary's directory or its relative neighbors are writable, the dependency tree can be hijacked. |
 | **Writable Path** | Absolute search paths (system or user-defined) that are writable by the current user, allowing for direct replacement or tree recreation. |
 | **Relative Path** | Hardcoded relative paths (e.g., `lib/`) that resolve against the CWD rather than the binary's location. |
@@ -23,12 +24,14 @@
 
 `sohps` simulates the following `ld.so` logic:
 
+- **Native AppImage Support**: Extracts and analyzes Type-2 AppImages natively (using a pure-Go SquashFS implementation) to detect vulnerable `AppRun` wrappers and insecure internal binaries.
 - **Linker Macro Expansion**: Full support for `$ORIGIN`, `$LIB`, and `$PLATFORM` expansion based on the target binary's architecture.
 - **Search Path Prioritization**: Correctly handles the precedence of `DT_RPATH` vs. `DT_RUNPATH` and their interaction with `LD_LIBRARY_PATH`.
 - **Recursive Configuration Parsing**: Parses `/etc/ld.so.conf` and all nested `include` directives to build an accurate map of system search paths.
 - **HWCAP Resolution**: Simulates hardware capability searches (e.g., `tls/aarch64/aarch64`) to identify "hidden" search directories.
 - **AT_SECURE Awareness**: Automatically detects SUID/SGID bits and ignores untrusted paths (relative paths, `$ORIGIN`) just as the kernel would.
 - **Symlink De-duplication**: Efficiently scans large directories by resolving symlinks and analyzing each unique binary only once.
+- **Transitive Analysis**: Fully maps the transitive dependency tree to uncover vulnerabilities deep within required libraries.
 
 ---
 
