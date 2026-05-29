@@ -118,7 +118,7 @@ This will enumerate all 6 primary vulnerability classes, including **System Prel
 ```
 $ ./sohps testenv/bin
 [*] Scanning testenv/bin...
-[*] Found 13 ELF binaries. Starting analysis...
+[*] Found 14 ELF binaries. Starting analysis...
 
 [*] testenv/bin/test_implicit_cwd
     [!] Implicit CWD
@@ -224,6 +224,14 @@ $ ./sohps testenv/bin
     Action          : RECREATE: Writable parent (/tmp/sohps_test). Recreate full path and drop payload at: /tmp/sohps_test/rpath/tls/aarch64/aarch64/libc.so.6
     Libraries (1)   : libc.so.6
 
+[*] testenv/bin/test_appimage.AppImage
+    [!] Environment Poisoning
+    Vulnerable Path : Internal AppRun:1
+    Resolved Dir    : Runtime Environment
+    Action          : CWD HIJACK: Script poisons LD_LIBRARY_PATH when empty. Ensure it is unset, drop malicious library in CWD, and execute.
+    Libraries (2)   : ld-linux-aarch64.so.1 (Proxy Required)
+                      libc.so.6
+
 [*] testenv/bin/test_trailing_colon
     [!] Writable Path
     Vulnerable Path : /tmp
@@ -276,6 +284,6 @@ $ ./sohps testenv/bin
     Action          : RECREATE: Writable parent (/tmp/sohps_test). Recreate full path and drop payload at: /tmp/sohps_test/runpath/tls/aarch64/aarch64/libc.so.6
     Libraries (1)   : libc.so.6
 
-[*] Progress: [13/13] 100.0%
+[*] Progress: [14/14] 100.0%
 [*] Scan complete.
 ```
