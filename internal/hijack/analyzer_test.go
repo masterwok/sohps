@@ -13,10 +13,10 @@ import (
 // It uses real temporary directories and files to ensure permissions are handled accurately.
 func TestEvaluateHijackVector(t *testing.T) {
 	tests := []struct {
-		name        string
-		setup       func(dir string) (target string, dirPath string, exists bool)
-		wantHijack  bool
-		wantAction  string // substring match
+		name       string
+		setup      func(dir string) (target string, dirPath string, exists bool)
+		wantHijack bool
+		wantAction string // substring match
 	}{
 		{
 			name: "Missing library in writable directory",
@@ -105,7 +105,7 @@ func TestEvaluateHijackVector(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			tmp := t.TempDir()
-			
+
 			fs.RootPath = tmp
 			defer func() { fs.RootPath = "" }()
 
@@ -251,9 +251,9 @@ func TestBuildSearchPathsATSecure(t *testing.T) {
 	targetBinary := "/opt/app/bin/suid_target"
 
 	rawPaths := []string{
-		"$ORIGIN/lib",     // Should be DROPPED
-		"lib/",            // Should be DROPPED
-		"/opt/trusted/lib",// Should be KEPT
+		"$ORIGIN/lib",      // Should be DROPPED
+		"lib/",             // Should be DROPPED
+		"/opt/trusted/lib", // Should be KEPT
 	}
 
 	expected := []SearchPath{
@@ -275,10 +275,10 @@ func TestBuildSearchPathsATSecure(t *testing.T) {
 // It must accurately mimic the linker's stop-at-first-match behavior.
 func TestCheckSearchPathLib(t *testing.T) {
 	tmp := t.TempDir()
-	
+
 	fs.RootPath = tmp
 	defer func() { fs.RootPath = "" }()
-	
+
 	// Setup:
 	// 1. /tmp/dir1 (Writable, No file)
 	// 2. /tmp/dir2 (Read-only, Has file) -> Linker should stop here
@@ -290,7 +290,7 @@ func TestCheckSearchPathLib(t *testing.T) {
 	os.Mkdir(dir1, 0777)
 	os.Mkdir(dir2, 0777)
 	os.Mkdir(dir3, 0777)
-	
+
 	// Sandbox the TempDir so parent directory checks don't bleed into /tmp
 	// We must do this AFTER creating the subdirectories, otherwise Mkdir fails!
 	os.Chmod(tmp, 0555)
@@ -298,8 +298,8 @@ func TestCheckSearchPathLib(t *testing.T) {
 
 	libName := "libtest.so"
 	os.WriteFile(filepath.Join(dir2, libName), []byte("data"), 0444) // File must be RO to be safe
-	os.Chmod(dir2, 0555) // Make dir2 RO so the file itself isn't hijackable
-	defer os.Chmod(dir2, 0777) // Cleanup for TempDir
+	os.Chmod(dir2, 0555)                                             // Make dir2 RO so the file itself isn't hijackable
+	defer os.Chmod(dir2, 0777)                                       // Cleanup for TempDir
 
 	searchPaths := []SearchPath{
 		{Raw: "dir1", Resolved: dir1},
@@ -326,5 +326,74 @@ func TestCheckSearchPathLib(t *testing.T) {
 		if strings.Contains(c.ResolvedDir, dir3) {
 			t.Errorf("FAIL: flagged %s, but linker should have stopped at %s", c.ResolvedDir, dir2)
 		}
+	}
+}
+
+func TestAnalyze(t *testing.T) {
+	tmp := t.TempDir()
+
+	// Writable directory for testing paths
+	writableDir := filepath.Join(tmp, "writable")
+	os.Mkdir(writableDir, 0777)
+	defer os.Chmod(writableDir, 0777)
+
+	// Create a mock search path pointing to the writable directory
+	rawPaths := []SearchPath{
+		{Raw: "/usr/lib", Resolved: writableDir},
+	}
+	
+	// Create proxy map
+	proxyReqMap := map[string]bool{
+		"libdirect.so": true,
+		"libtransitive.so": false,
+	}
+
+	directLibs := []string{"libdirect.so", "/tmp/abs_direct.so"}
+	transitiveLibs := []string{"libtransitive.so", "/tmp/abs_trans.so"}
+
+	// Note: absolute paths in direct/transitive bypass search paths and use checkAbsPathLib directly.
+	// /tmp/abs_direct.so will be considered relative to root (tmp) so it resolves to tmp/tmp/abs_direct.so
+	// Let's create the parent directory for the absolute path so it's hijackable.
+	absDir := filepath.Join(tmp, "tmp")
+	os.Mkdir(absDir, 0777)
+
+	candidates := Analyze(rawPaths, directLibs, transitiveLibs, proxyReqMap, "/mock/bin", "EM_X86_64", tmp)
+
+	if len(candidates) == 0 {
+		t.Fatalf("Expected candidates from Analyze")
+	}
+
+	foundDirect := false
+	foundTransitive := false
+	foundAbsDirect := false
+	
+	for _, c := range candidates {
+		switch c.Library {
+		case "libdirect.so":
+			foundDirect = true
+			if !c.ProxyRequired {
+				t.Errorf("Expected ProxyRequired=true for libdirect.so")
+			}
+			if c.DependencyType != "Direct" {
+				t.Errorf("Expected DependencyType=Direct for libdirect.so")
+			}
+		case "libtransitive.so":
+			foundTransitive = true
+			if c.ProxyRequired {
+				t.Errorf("Expected ProxyRequired=false for libtransitive.so")
+			}
+			if c.DependencyType != "Transitive" {
+				t.Errorf("Expected DependencyType=Transitive for libtransitive.so")
+			}
+		case "/tmp/abs_direct.so":
+			foundAbsDirect = true
+			if c.Category != "Absolute Path" {
+				t.Errorf("Expected Absolute Path category for abs direct")
+			}
+		}
+	}
+
+	if !foundDirect || !foundTransitive || !foundAbsDirect {
+		t.Errorf("Missing expected candidates from Analyze")
 	}
 }

@@ -79,7 +79,7 @@ func PrintFindings(candidates []*hijack.HijackCandidate) {
 		resolved string
 		action   string
 	}
-	
+
 	type libInfo struct {
 		name          string
 		depType       string
@@ -95,7 +95,7 @@ func PrintFindings(candidates []*hijack.HijackCandidate) {
 			continue
 		}
 		key := groupKey{c.Category, c.ResolvedDir, c.Action}
-		
+
 		// Add library if not already in this group
 		found := false
 		for _, l := range groups[key] {

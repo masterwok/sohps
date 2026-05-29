@@ -33,7 +33,6 @@ func main() {
 		os.Exit(1)
 	}
 
-
 	report.Init(args.Verbose, args.NoColor)
 
 	fs.RootPath = args.RootPath
@@ -87,6 +86,11 @@ func main() {
 		}
 		close(jobs)
 
+		go func() {
+			wg.Wait()
+			close(results)
+		}()
+
 		// Progress tracker
 		count := 0
 		for range results {
@@ -94,15 +98,10 @@ func main() {
 			if args.IsDirectoryScan && count%100 == 0 {
 				fmt.Printf("\r[*] Progress: [%d/%d] %.1f%%", count, totalFiles, float64(count)/float64(totalFiles)*100)
 			}
-			if count == totalFiles {
-				break
-			}
 		}
 		if args.IsDirectoryScan {
 			fmt.Printf("\r[*] Progress: [%d/%d] 100.0%%\n", totalFiles, totalFiles)
 		}
-
-		wg.Wait()
 		fmt.Println("[*] Scan complete.")
 
 	} else {
@@ -112,7 +111,7 @@ func main() {
 
 func processBinary(path string, args *Args) {
 	var candidates []*hijack.HijackCandidate
-	
+
 	f, err := elfparser.GetHandle(path)
 	if err != nil {
 		return
@@ -164,7 +163,7 @@ func processBinary(path string, args *Args) {
 	rawPaths := elfparser.ExtractRawSearchPaths(f, args.LDLibraryPath, args.RootPath)
 	// We need to pass the machine type and root correctly
 	hijackSearchPaths := hijack.BuildSearchPaths(rawPaths, path, fs.IsATSecure(path), f.Machine.String(), args.RootPath)
-	
+
 	elfCandidates := hijack.Analyze(hijackSearchPaths, directLibs, transitiveLibs, proxyReqMap, path, f.Machine.String(), args.RootPath)
 	candidates = append(candidates, elfCandidates...)
 

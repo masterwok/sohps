@@ -85,7 +85,7 @@ func AuditAppImage(path string, offset int64, libs []string) []*hijack.HijackCan
 		if err != nil || info.IsDir() {
 			return nil
 		}
-		
+
 		f, err := os.Open(path)
 		if err != nil {
 			return nil
@@ -116,7 +116,7 @@ func AuditAppImage(path string, offset int64, libs []string) []*hijack.HijackCan
 	}
 
 	// 3. Recursively resolve everything using the AppImage's internal search paths
-	// We use the first ELF in tmpDir as a dummy 'path' to ResolveTransitiveDependencies 
+	// We use the first ELF in tmpDir as a dummy 'path' to ResolveTransitiveDependencies
 	// to trigger search path extraction, or just pass the AppImage path itself.
 	allLibs, proxyReqMap, _ := elfparser.ResolveTransitiveDependencies(path, uniqueDirect, extraSearchPaths, "", "/")
 
@@ -160,7 +160,7 @@ func auditAppRun(scriptPath string, directLibs []string, transitiveLibs []string
 		if strings.HasPrefix(line, "export ") && strings.Contains(line, "=") {
 			parts := strings.SplitN(line[7:], "=", 2)
 			vVar := strings.TrimSpace(parts[0])
-			
+
 			// If the variable is used in the value with a leading colon (e.g. :$VAR or :${VAR})
 			// and there is no protective check on the line (like [ -z "$VAR" ]), it's a finding.
 			if strings.Contains(parts[1], ":$"+vVar) || strings.Contains(parts[1], ":${"+vVar+"}") {

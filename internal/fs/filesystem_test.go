@@ -23,7 +23,7 @@ func TestIsWritable(t *testing.T) {
 		// Note: On some systems/CI environments, the owner can always write.
 		// However, unix.Access(W_OK) should respect the mode bits.
 		if IsWritable(d) {
-			// We only fail if we're sure we're not running as root, 
+			// We only fail if we're sure we're not running as root,
 			// but usually in tests we skip this if it's unreliable.
 			// For sohps, we assume the test environment allows mode bit testing.
 			t.Log("Warning: IsWritable returned true for 0555 directory (running as root?)")
@@ -81,19 +81,19 @@ func TestIsATSecure(t *testing.T) {
 
 func TestFindWritableParent(t *testing.T) {
 	tmp := t.TempDir()
-	
+
 	// Create a nested structure
 	// tmp (Writable)
 	//  └── parent (Writable)
 	//       └── child (Read-only)
 	//            └── target (Missing)
-	
+
 	parent := filepath.Join(tmp, "parent")
 	os.Mkdir(parent, 0777)
-	
+
 	child := filepath.Join(parent, "child")
 	os.Mkdir(child, 0555)
-	
+
 	target := filepath.Join(child, "target_dir")
 
 	t.Run("Finds writable parent", func(t *testing.T) {
@@ -106,11 +106,11 @@ func TestFindWritableParent(t *testing.T) {
 		// We go up to parent (Writable).
 		// We should find parent.
 		foundDir, found := FindWritableParent(target)
-		
+
 		if !found {
 			t.Fatalf("FindWritableParent failed to find a writable parent")
 		}
-		
+
 		if foundDir != parent {
 			t.Errorf("expected parent %s, got %s", parent, foundDir)
 		}
@@ -124,7 +124,7 @@ func TestFindWritableParent(t *testing.T) {
 		// Then we hit parent (which is RootPath).
 		// The loop should break and return nothing.
 		foundDir, found := FindWritableParent(target)
-		
+
 		if found {
 			t.Errorf("expected no writable parent found, but got: %s", foundDir)
 		}

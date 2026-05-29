@@ -48,7 +48,7 @@ func BuildSearchPaths(rawPaths []string, targetBinary string, isSecure bool, mac
 	// Determine $LIB and $PLATFORM expansions based on ELF Machine type
 	libMacro := "lib"
 	platformMacro := "unknown"
-	
+
 	switch machineType {
 	case "EM_X86_64":
 		libMacro = "lib64"

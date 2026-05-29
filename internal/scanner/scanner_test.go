@@ -48,13 +48,13 @@ func TestDiscoverBinaries(t *testing.T) {
 	// tmp/subdir/bin2.elf
 	// tmp/subdir/link_to_bin1 -> ../bin1.elf (Should be de-duplicated)
 	// tmp/proc/bin3.elf (Should be ignored)
-	
+
 	bin1 := filepath.Join(tmp, "bin1.elf")
 	os.WriteFile(bin1, []byte("\x7fELF1"), 0755)
 
 	subdir := filepath.Join(tmp, "subdir")
 	os.Mkdir(subdir, 0755)
-	
+
 	bin2 := filepath.Join(subdir, "bin2.elf")
 	os.WriteFile(bin2, []byte("\x7fELF2"), 0755)
 
@@ -73,7 +73,7 @@ func TestDiscoverBinaries(t *testing.T) {
 	}
 
 	// We expect bin1 and bin2. bin3 is in .git (ignored). link_to_bin1 is bin1 (de-duplicated).
-	
+
 	if len(results) != 2 {
 		t.Errorf("expected 2 binaries, got %d: %v", len(results), results)
 	}

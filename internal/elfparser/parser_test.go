@@ -101,3 +101,80 @@ func TestParseLdConf(t *testing.T) {
 		t.Errorf("got %v, want %v", result, expected)
 	}
 }
+
+func TestAppImageParsing(t *testing.T) {
+	ensureTestBinaries(t)
+
+	appImagePath := filepath.Join("..", "..", "testenv", "bin", "test_appimage.AppImage")
+	if _, err := os.Stat(appImagePath); os.IsNotExist(err) {
+		t.Skipf("Test binary %s not found. Skipping AppImage test.", appImagePath)
+	}
+
+	t.Run("IsAppImage", func(t *testing.T) {
+		if !IsAppImage(appImagePath) {
+			t.Errorf("Expected IsAppImage to return true for %s", appImagePath)
+		}
+	})
+
+	t.Run("GetAppImageOffset", func(t *testing.T) {
+		offset := GetAppImageOffset(appImagePath)
+		if offset == 0 {
+			t.Errorf("Expected GetAppImageOffset to return a valid offset, got 0")
+		}
+	})
+
+	t.Run("Not AppImage", func(t *testing.T) {
+		notAppImage := filepath.Join("..", "..", "testenv", "bin", "test_rpath")
+		if IsAppImage(notAppImage) {
+			t.Errorf("Expected IsAppImage to return false for regular ELF")
+		}
+	})
+}
+
+func TestELFHelpers(t *testing.T) {
+	ensureTestBinaries(t)
+
+	// test_writable_path uses -lcustom which should appear in DT_NEEDED
+	testBin := filepath.Join("..", "..", "testenv", "bin", "test_writable_path")
+	if _, err := os.Stat(testBin); os.IsNotExist(err) {
+		t.Skipf("Test binary %s not found. Skipping ELF helpers test.", testBin)
+	}
+
+	f, err := GetHandle(testBin)
+	if err != nil {
+		t.Fatalf("Failed to open %s: %v", testBin, err)
+	}
+	defer f.Close()
+
+	t.Run("GetRequiredLibraries", func(t *testing.T) {
+		libs, err := GetRequiredLibraries(f)
+		if err != nil {
+			t.Fatalf("GetRequiredLibraries failed: %v", err)
+		}
+		
+		foundCustom := false
+		for _, lib := range libs {
+			if lib == "libcustom.so" {
+				foundCustom = true
+				break
+			}
+		}
+		if !foundCustom {
+			t.Errorf("Expected to find libcustom.so in required libraries, got %v", libs)
+		}
+	})
+
+	t.Run("HasBindNow", func(t *testing.T) {
+		// test_writable_path is not built with -z now, so it shouldn't have bind now
+		if HasBindNow(f) {
+			t.Errorf("Expected HasBindNow to return false for test_writable_path")
+		}
+	})
+	
+	t.Run("GetDataObjects", func(t *testing.T) {
+		undef, exported := GetDataObjects(f)
+		// Usually main binaries have some exported data objects but might not have undefined ones
+		_ = undef
+		_ = exported
+	})
+}

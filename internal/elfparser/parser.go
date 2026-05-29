@@ -3,7 +3,9 @@ package elfparser
 
 import (
 	"debug/elf"
+	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,7 +20,7 @@ func GetRequiredLibraries(f *elf.File) ([]string, error) {
 		return nil, fmt.Errorf("failed to read DT_NEEDED: %w", err)
 	}
 
-	// Also extract DT_AUDIT and DT_DEPAUDIT, as these are loaded by ld.so 
+	// Also extract DT_AUDIT and DT_DEPAUDIT, as these are loaded by ld.so
 	// before execution and are subject to the same hijack vectors.
 	if audits, err := f.DynString(elf.DynTag(0x7ffffffc)); err == nil {
 		libs = append(libs, audits...)
@@ -95,7 +97,6 @@ func GetDataObjects(f *elf.File) (undef []string, exported []string) {
 	return
 }
 
-
 // ResolveTransitiveDependencies recursively finds all libraries required by the binary.
 // It returns a map of library name to its resolved absolute path on the system,
 // and a map indicating if a library requires a proxy (has versioned symbols requested from it, or is loaded by a parent enforcing BIND_NOW).
@@ -142,7 +143,7 @@ func ResolveTransitiveDependencies(path string, initialLibs []string, extraSearc
 
 	// Initial search paths from the main binary
 	searchPaths := ExtractRawSearchPaths(f, ldLibraryPath, root)
-	
+
 	// Add extra search paths at the beginning
 	searchPaths = append(extraSearchPaths, searchPaths...)
 
@@ -179,11 +180,11 @@ func ResolveTransitiveDependencies(path string, initialLibs []string, extraSearc
 		if err != nil {
 			continue
 		}
-		
+
 		subLibs, err := GetRequiredLibraries(libF)
-		
+
 		parentIsBindNow := HasBindNow(libF)
-		
+
 		for _, l := range GetVersionedDependencies(libF) {
 			proxyReqMap[l] = true
 		}
@@ -236,7 +237,7 @@ func findLibrary(libName string, rawPaths []string, binDir string, root string) 
 		resolved := raw
 		resolved = strings.ReplaceAll(resolved, "$ORIGIN", binDir)
 		resolved = strings.ReplaceAll(resolved, "${ORIGIN}", binDir)
-		
+
 		// If it's an empty path, it's CWD
 		if resolved == "" {
 			resolved = "."
@@ -334,7 +335,6 @@ func ExtractRawSearchPaths(f *elf.File, ldLibraryPath string, root string) []str
 	return append(searchPaths, systemPaths...)
 }
 
-
 // IsAppImage checks if the file is an AppImage Type 2 (contains AI\x02 at offset 8).
 func IsAppImage(path string) bool {
 	f, err := os.Open(path)
@@ -376,23 +376,28 @@ func GetAppImageOffset(path string) int64 {
 	}
 	defer file.Close()
 
-	header := make([]byte, 64)
-	if _, err := file.ReadAt(header, 0); err != nil {
+	var ident [16]byte
+	if _, err := file.ReadAt(ident[:], 0); err != nil {
 		return maxOffset
 	}
 
 	var shoff int64
 	var shentsize, shnum int
 
-	if header[4] == 2 { // ELFCLASS64
-		shoff = int64(header[40]) | int64(header[41])<<8 | int64(header[42])<<16 | int64(header[43])<<24 |
-			int64(header[44])<<32 | int64(header[45])<<40 | int64(header[46])<<48 | int64(header[47])<<56
-		shentsize = int(header[58]) | int(header[59])<<8
-		shnum = int(header[60]) | int(header[61])<<8
-	} else { // ELFCLASS32
-		shoff = int64(header[32]) | int64(header[33])<<8 | int64(header[34])<<16 | int64(header[35])<<24
-		shentsize = int(header[46]) | int(header[47])<<8
-		shnum = int(header[48]) | int(header[49])<<8
+	if elf.Class(ident[4]) == elf.ELFCLASS64 {
+		var hdr elf.Header64
+		if err := binary.Read(io.NewSectionReader(file, 0, 64), f.ByteOrder, &hdr); err == nil {
+			shoff = int64(hdr.Shoff)
+			shentsize = int(hdr.Shentsize)
+			shnum = int(hdr.Shnum)
+		}
+	} else {
+		var hdr elf.Header32
+		if err := binary.Read(io.NewSectionReader(file, 0, 52), f.ByteOrder, &hdr); err == nil {
+			shoff = int64(hdr.Shoff)
+			shentsize = int(hdr.Shentsize)
+			shnum = int(hdr.Shnum)
+		}
 	}
 
 	tableEnd := shoff + int64(shnum*shentsize)
@@ -401,4 +406,3 @@ func GetAppImageOffset(path string) int64 {
 	}
 	return maxOffset
 }
-

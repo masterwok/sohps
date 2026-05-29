@@ -73,13 +73,12 @@ func checkSearchPathLib(searchPaths []SearchPath, libName string, machineType st
 			category = "Relative Path"
 		} else if fs.IsWritable(path.Resolved) {
 			category = "Writable Path"
-		} else if parent, found := fs.FindWritableParent(path.Resolved); found {
-			_ = parent // parent found, so it's a writable path via recreation
+		} else if _, found := fs.FindWritableParent(path.Resolved); found {
 			category = "Writable Path"
 		}
 
 		hwcapPaths := getHWCAPPaths(path.Resolved, machineType)
-		
+
 		// Pass 1: Does the file exist anywhere in this search path segment?
 		// ld.so stops searching globally once the file is found.
 		var existingPath string
@@ -102,13 +101,13 @@ func checkSearchPathLib(searchPaths []SearchPath, libName string, machineType st
 				DependencyType: depType,
 				ProxyRequired:  proxyRequired,
 			}
-			
+
 			candidate.CanHijack, candidate.Action = evaluateHijackVector(fullPath, existingPath, true)
 
 			if candidate.CanHijack {
 				candidates = append(candidates, candidate)
 			}
-			
+
 			// Linker stops searching completely once file is found
 			break
 		}

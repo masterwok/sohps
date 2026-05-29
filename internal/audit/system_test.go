@@ -39,7 +39,6 @@ func TestCheckSystemPreload(t *testing.T) {
 		// Create the etc directory inside the dummy root
 		os.Mkdir(filepath.Join(dummyRoot, "etc"), 0777)
 
-
 		candidates := CheckSystemPreload(dummyRoot)
 
 		if len(candidates) == 0 {

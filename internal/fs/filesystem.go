@@ -28,7 +28,7 @@ func IsATSecure(path string) bool {
 	if err != nil {
 		return false
 	}
-	
+
 	mode := info.Mode()
 	return mode&os.ModeSetuid != 0 || mode&os.ModeSetgid != 0
 }
@@ -43,12 +43,12 @@ func FindWritableParent(targetPath string) (string, bool) {
 
 	for {
 		parent := filepath.Dir(dir)
-		
+
 		// If filepath.Dir returns the same path, we've hit the root (e.g., "/")
 		if parent == dir {
 			break
 		}
-		
+
 		// Do not evaluate the configured root itself (or anything above it) as a writable parent.
 		if RootPath != "" && RootPath != "/" && len(parent) <= len(RootPath) {
 			break

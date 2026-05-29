@@ -19,14 +19,14 @@ func DiscoverBinaries(targetPath string, root string) ([]string, error) {
 		// Prune virtual and irrelevant directories to speed up root scans.
 		if d.IsDir() {
 			name := d.Name()
-			
+
 			// 1. Skip specifically excluded system directories if they are at the root.
 			// We check both absolute path and ensure it's at the top level of the configured root.
 			abs, _ := filepath.Abs(path)
-			
+
 			// Virtual directories to prune
 			pruneDirs := []string{"/proc", "/sys", "/dev", "/run", "/snap", "/var/lib/lxcfs"}
-			
+
 			for _, p := range pruneDirs {
 				// Match either the system path or the rootfs-prefixed path
 				if abs == p || abs == filepath.Join(root, p) {
@@ -43,7 +43,7 @@ func DiscoverBinaries(targetPath string, root string) ([]string, error) {
 			if strings.HasPrefix(name, ".") && path != targetPath {
 				return filepath.SkipDir
 			}
-			
+
 			return nil
 		}
 

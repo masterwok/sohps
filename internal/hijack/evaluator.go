@@ -6,7 +6,7 @@ import (
 	"github.com/masterwok/sohps/internal/fs"
 )
 
-// evaluateHijackVector routes the vulnerability check to the appropriate 
+// evaluateHijackVector routes the vulnerability check to the appropriate
 // specialized function based on file existence, adhering to SRP.
 func evaluateHijackVector(targetPath, dirPath string, fileExists bool) (bool, string) {
 	if fileExists {

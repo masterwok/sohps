@@ -11,10 +11,10 @@ type SearchPath struct {
 // HijackCandidate represents a verified privilege escalation path
 // via shared object hijacking.
 type HijackCandidate struct {
-	Library      string // The name of the target shared object (e.g., "libc.so.6" or "/tmp/lib.so")
-	Category     string // The vulnerability category (e.g., "Implicit CWD", "Writable Path")
-	RawRunPath   string // The search path segment evaluated, or "Hardcoded Absolute Path"
-	ResolvedDir  string // The absolute directory path where the vulnerability exists
+	Library        string // The name of the target shared object (e.g., "libc.so.6" or "/tmp/lib.so")
+	Category       string // The vulnerability category (e.g., "Implicit CWD", "Writable Path")
+	RawRunPath     string // The search path segment evaluated, or "Hardcoded Absolute Path"
+	ResolvedDir    string // The absolute directory path where the vulnerability exists
 	CanHijack      bool   // True if library can be hijacked
 	Action         string // Instructions for exploitation
 	DependencyType string // "Direct" or "Transitive"
