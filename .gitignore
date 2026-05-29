@@ -2,6 +2,7 @@
 .gemini/
 GEMINI.md
 .gemini-agent/
+.antigravitycli/
 plans/
 memory/
 findings.txt

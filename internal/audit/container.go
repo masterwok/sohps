@@ -5,41 +5,34 @@ import (
 	"debug/elf"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/CalebQ42/squashfs"
 	"github.com/masterwok/sohps/internal/elfparser"
 	"github.com/masterwok/sohps/internal/hijack"
 )
 
 // AuditAppImage performs a security audit on an AppImage's internal configuration.
 func AuditAppImage(path string, offset int64, libs []string) []*hijack.HijackCandidate {
-	// unsquashfs is a required external dependency for AppImage analysis.
-	if _, err := exec.LookPath("unsquashfs"); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: 'unsquashfs' command not found in PATH. Please install squashfs-tools.")
-		return nil // Cannot audit without this tool.
-	}
-
-	// The version of unsquashfs on the target system requires that the destination
-	// directory does not exist. We create a temporary directory to get a unique name,
-	// then immediately remove it and let unsquashfs create it.
 	tmpDir, err := os.MkdirTemp("", "sohps_appimage_*")
 	if err != nil {
-		// If we can't even create a temp dir, something is seriously wrong.
-		return nil
-	}
-	if err := os.Remove(tmpDir); err != nil {
-		// If we can't remove it, we can't proceed.
 		return nil
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Extract the entire SquashFS to find all binaries
-	cmd := exec.Command("unsquashfs", "-offset", fmt.Sprintf("%d", offset), "-dest", tmpDir, path)
-	if err := cmd.Run(); err != nil {
-		// This can fail if the AppImage is corrupted or if unsquashfs has an issue.
-		// We can't proceed with the audit if the extraction fails.
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+
+	sq, err := squashfs.NewReaderAtOffset(f, offset)
+	if err != nil {
+		return nil
+	}
+
+	if err := sq.ExtractWithOptions(tmpDir, squashfs.DefaultOptions()); err != nil {
 		return nil
 	}
 
