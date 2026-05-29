@@ -6,7 +6,7 @@ BIN_DIR = bin
 BUILD_DIR = build
 SRC = main.c
 
-all: setup_env binaries
+all: setup_env binaries appimage
 
 setup_env:
 	mkdir -p $(BIN_DIR) $(BUILD_DIR)
@@ -81,6 +81,19 @@ binaries: $(BUILD_DIR)/libcustom.so
 	
 	# 2. Trailing Colon RUNPATH (Vulnerable)
 	$(CC) $(CFLAGS) test_empty_runpath.c -o $(BIN_DIR)/test_trailing_colon -Wl,--enable-new-dtags -Wl,-rpath,"/tmp:"
+
+appimage:
+	# --- AppImage Target ---
+	mkdir -p $(BUILD_DIR)/AppDir/usr/lib
+	echo 'export LD_LIBRARY_PATH=$$HERE/usr/lib:$$LD_LIBRARY_PATH' > $(BUILD_DIR)/AppDir/AppRun
+	chmod +x $(BUILD_DIR)/AppDir/AppRun
+	touch $(BUILD_DIR)/AppDir/usr/lib/libtest.so
+	rm -f $(BUILD_DIR)/dummy.sqsh
+	mksquashfs $(BUILD_DIR)/AppDir $(BUILD_DIR)/dummy.sqsh -root-owned -noappend
+	$(CC) $(CFLAGS) test_empty_runpath.c -o $(BUILD_DIR)/dummy_runtime
+	printf 'AI\002' | dd of=$(BUILD_DIR)/dummy_runtime bs=1 seek=8 conv=notrunc
+	cat $(BUILD_DIR)/dummy_runtime $(BUILD_DIR)/dummy.sqsh > $(BIN_DIR)/test_appimage.AppImage
+	chmod +x $(BIN_DIR)/test_appimage.AppImage
 
 clean:
 	-chmod -R 777 /tmp/sohps_test /tmp/sohps_readonly /tmp/sohps_writable_file 2>/dev/null
