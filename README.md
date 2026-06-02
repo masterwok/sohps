@@ -1,6 +1,6 @@
 # sohps: Shared Object Hijack Path Scanner
 
-`sohps` is a security auditing tool designed to identify privilege escalation vectors within Linux ELF binaries and AppImage containers. By accurately simulating the behavior of the Linux dynamic linker (`ld.so`), `sohps` maps how binaries resolve their shared object dependencies and uncovers vulnerabilities introduced by insecure search paths, writable directories, or misconfigured environments.
+`sohps` is a security auditing tool designed to identify shared object hijack vulnerabilities in Linux ELF binaries and AppImage containers. By simulating the behavior of the Linux dynamic linker (`ld.so`), sohps maps how binaries resolve their shared object dependencies and uncovers vulnerabilities introduced by insecure search paths, writable directories, or misconfigured environments.
 
 ---
 
