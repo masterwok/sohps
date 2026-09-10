@@ -33,12 +33,15 @@ func IsATSecure(path string) bool {
 	return mode&os.ModeSetuid != 0 || mode&os.ModeSetgid != 0
 }
 
-var RootPath string
-
 // FindWritableParent walks up the directory tree from the given path.
 // It returns the first directory that is writable, or an empty string if none are found.
-// It stops when it reaches the root directory or the configured RootPath.
-func FindWritableParent(targetPath string) (string, bool) {
+// It stops when it reaches the root directory or the configured rootPath.
+//
+// rootPath is taken as a parameter rather than package state so this is
+// safe to call concurrently across multiple scans with different roots -
+// it used to be a package-level var, which raced when callers embedding
+// this package ran more than one scan at a time.
+func FindWritableParent(targetPath, rootPath string) (string, bool) {
 	dir := targetPath
 
 	for {
@@ -50,7 +53,7 @@ func FindWritableParent(targetPath string) (string, bool) {
 		}
 
 		// Do not evaluate the configured root itself (or anything above it) as a writable parent.
-		if RootPath != "" && RootPath != "/" && len(parent) <= len(RootPath) {
+		if rootPath != "" && rootPath != "/" && len(parent) <= len(rootPath) {
 			break
 		}
 

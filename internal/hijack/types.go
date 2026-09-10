@@ -20,4 +20,5 @@ type HijackCandidate struct {
 	DependencyType string // "Direct" or "Transitive"
 	ProxyRequired  bool   // True if the library uses symbol versioning (harder to hijack)
 	IsEnvVar       bool   // True if the 'Library' field actually holds an environment variable name
+	Binary         string // The ELF binary or AppImage this candidate was found analyzing, if any (empty for system-wide checks like System Preload)
 }

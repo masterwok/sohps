@@ -35,7 +35,6 @@ func main() {
 
 	report.Init(args.Verbose, args.NoColor)
 
-	fs.RootPath = args.RootPath
 	globalCandidates := audit.CheckSystemPreload(args.RootPath)
 	if len(globalCandidates) > 0 {
 		report.PrintTarget("Global System Audit")

@@ -15,7 +15,7 @@ func Analyze(rawPaths []SearchPath, directLibs []string, transitiveLibs []string
 		if strings.Contains(lib, "/") {
 			hijackCandidates = append(hijackCandidates, checkAbsPathLib(lib, "Direct", proxyReqMap[lib], root))
 		} else {
-			hijackCandidates = append(hijackCandidates, checkSearchPathLib(rawPaths, lib, machineType, "Direct", proxyReqMap[lib])...)
+			hijackCandidates = append(hijackCandidates, checkSearchPathLib(rawPaths, lib, machineType, "Direct", proxyReqMap[lib], root)...)
 		}
 	}
 
@@ -32,8 +32,12 @@ func Analyze(rawPaths []SearchPath, directLibs []string, transitiveLibs []string
 		if strings.Contains(lib, "/") {
 			hijackCandidates = append(hijackCandidates, checkAbsPathLib(lib, "Transitive", proxyReqMap[lib], root))
 		} else {
-			hijackCandidates = append(hijackCandidates, checkSearchPathLib(systemPaths, lib, machineType, "Transitive", proxyReqMap[lib])...)
+			hijackCandidates = append(hijackCandidates, checkSearchPathLib(systemPaths, lib, machineType, "Transitive", proxyReqMap[lib], root)...)
 		}
+	}
+
+	for _, c := range hijackCandidates {
+		c.Binary = targetPath
 	}
 
 	return hijackCandidates
@@ -41,7 +45,7 @@ func Analyze(rawPaths []SearchPath, directLibs []string, transitiveLibs []string
 
 // huntSearchPathLib iterates through the dynamic linker's search paths.
 // It returns a slice of all viable hijack candidates found along the route.
-func checkSearchPathLib(searchPaths []SearchPath, libName string, machineType string, depType string, proxyRequired bool) []*HijackCandidate {
+func checkSearchPathLib(searchPaths []SearchPath, libName string, machineType string, depType string, proxyRequired bool, root string) []*HijackCandidate {
 	var candidates []*HijackCandidate
 
 	for _, path := range searchPaths {
@@ -73,7 +77,7 @@ func checkSearchPathLib(searchPaths []SearchPath, libName string, machineType st
 			category = "Relative Path"
 		} else if fs.IsWritable(path.Resolved) {
 			category = "Writable Path"
-		} else if _, found := fs.FindWritableParent(path.Resolved); found {
+		} else if _, found := fs.FindWritableParent(path.Resolved, root); found {
 			category = "Writable Path"
 		}
 
@@ -102,7 +106,7 @@ func checkSearchPathLib(searchPaths []SearchPath, libName string, machineType st
 				ProxyRequired:  proxyRequired,
 			}
 
-			candidate.CanHijack, candidate.Action = evaluateHijackVector(fullPath, existingPath, true)
+			candidate.CanHijack, candidate.Action = evaluateHijackVector(fullPath, existingPath, root, true)
 
 			if candidate.CanHijack {
 				candidates = append(candidates, candidate)
@@ -124,7 +128,7 @@ func checkSearchPathLib(searchPaths []SearchPath, libName string, machineType st
 				ProxyRequired:  proxyRequired,
 			}
 
-			candidate.CanHijack, candidate.Action = evaluateHijackVector(fullPath, hwcapDir, false)
+			candidate.CanHijack, candidate.Action = evaluateHijackVector(fullPath, hwcapDir, root, false)
 
 			if candidate.CanHijack {
 				candidates = append(candidates, candidate)
@@ -160,7 +164,7 @@ func checkAbsPathLib(libPath string, depType string, proxyRequired bool, root st
 		ProxyRequired:  proxyRequired,
 	}
 
-	candidate.CanHijack, candidate.Action = evaluateHijackVector(resolvedLib, targetDir, fileExists)
+	candidate.CanHijack, candidate.Action = evaluateHijackVector(resolvedLib, targetDir, root, fileExists)
 
 	return &candidate
 }

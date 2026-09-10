@@ -31,3 +31,7 @@ testenv/build/
 # OS Metadata
 .DS_Store
 Thumbs.db
+
+# Local working directories I'm too lazy to move
+exploits/
+scripts/

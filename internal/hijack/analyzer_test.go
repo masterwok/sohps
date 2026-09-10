@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/masterwok/sohps/internal/fs"
 )
 
 // TestEvaluateHijackVector tests the core vulnerability classification matrix.
@@ -106,9 +104,6 @@ func TestEvaluateHijackVector(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tmp := t.TempDir()
 
-			fs.RootPath = tmp
-			defer func() { fs.RootPath = "" }()
-
 			target, dir, exists := tc.setup(tmp)
 
 			// Ensure directory is writable before teardown
@@ -117,7 +112,7 @@ func TestEvaluateHijackVector(t *testing.T) {
 			// Ensure parent directory is writable before teardown (for the new tests)
 			defer os.Chmod(filepath.Dir(dir), 0777)
 
-			canHijack, action := evaluateHijackVector(target, dir, exists)
+			canHijack, action := evaluateHijackVector(target, dir, tmp, exists)
 			if canHijack != tc.wantHijack {
 				t.Errorf("got canHijack = %v, want %v", canHijack, tc.wantHijack)
 			}
@@ -276,9 +271,6 @@ func TestBuildSearchPathsATSecure(t *testing.T) {
 func TestCheckSearchPathLib(t *testing.T) {
 	tmp := t.TempDir()
 
-	fs.RootPath = tmp
-	defer func() { fs.RootPath = "" }()
-
 	// Setup:
 	// 1. /tmp/dir1 (Writable, No file)
 	// 2. /tmp/dir2 (Read-only, Has file) -> Linker should stop here
@@ -307,7 +299,7 @@ func TestCheckSearchPathLib(t *testing.T) {
 		{Raw: "dir3", Resolved: dir3},
 	}
 
-	candidates := checkSearchPathLib(searchPaths, libName, "EM_X86_64", "Direct", false)
+	candidates := checkSearchPathLib(searchPaths, libName, "EM_X86_64", "Direct", false, tmp)
 
 	// We expect exactly ONE candidate now because we fixed the HWCAP alert flood.
 	// The tool should only report the highest-priority HWCAP subdir for dir1.

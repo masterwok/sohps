@@ -133,7 +133,12 @@ func AuditAppImage(path string, offset int64, libs []string) []*hijack.HijackCan
 		}
 	}
 
-	return auditAppRun(appRunPath, uniqueDirect, transitiveLibs, extraSearchPaths, proxyReqMap)
+	candidates := auditAppRun(appRunPath, uniqueDirect, transitiveLibs, extraSearchPaths, proxyReqMap)
+	for _, c := range candidates {
+		c.Binary = path
+	}
+
+	return candidates
 }
 
 func auditAppRun(scriptPath string, directLibs []string, transitiveLibs []string, safePaths []string, proxyReqMap map[string]bool) []*hijack.HijackCandidate {
